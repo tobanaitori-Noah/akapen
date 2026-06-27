@@ -1,0 +1,62 @@
+{
+  "name": "akapen",
+  "version": "0.2.0",
+  "description": "AkaPen markdown review editor for local browser use",
+  "type": "module",
+  "bin": {
+    "akapen": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.node.json && vite build",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "markdown",
+    "review",
+    "criticmarkup"
+  ],
+  "author": {
+    "name": "ogawara-makoto",
+    "email": "tobanaitori_official@tobanaitori.net"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "express": "^5.1.0",
+    "open": "^10.2.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@akapen/markup": "file:./packages/markup",
+    "@akapen/shared": "file:./packages/shared",
+    "@codemirror/commands": "^6.10.1",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.11.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.1",
+    "@milkdown/kit": "^7.21.2",
+    "@types/express": "^5.0.3",
+    "@types/node": "^25.9.3",
+    "@types/ws": "^8.18.1",
+    "codemirror": "^6.0.2",
+    "diff": "^9.0.0",
+    "mdast-util-from-markdown": "2.0.3",
+    "@types/mdast": "^4.0.4",
+    "micromark-util-types": "^2.0.0",
+    "prosemirror-changeset": "^2.4.1",
+    "prosemirror-history": "^1.5.0",
+    "prosemirror-model": "^1.25.4",
+    "typescript": "^6.0.3",
+    "ulid": "^3.0.2",
+    "unist-util-visit": "^5.1.0",
+    "vite": "^5.4.21"
+  }
+}

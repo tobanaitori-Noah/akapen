@@ -1,0 +1,1298 @@
+/*
+ * AkaPen の意匠（計画2 Task 9）。正＝docs/design.md（DESIGN.md 公式フォーマット）。
+ * 基調は Snow Peak（モノトーン・余白・静かなタイポグラフィ）。
+ * 赤 --akapen-red は添削専用色＝UI クローム（ボタン/リンク/focus/見出し）に使わない。
+ * 添削マークと欄外注はシステムフォント（--font-body）で統一（plan18 T20）。
+ */
+:root {
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-hover: #f2f0ec;
+  --ink: #1c1c1c;
+  --ink-subtle: #6b6b6b;
+  --line: #e4e2de;
+  --focus-ring: rgba(28, 28, 28, 0.4);
+  --scrim: rgba(28, 28, 28, 0.32);
+  --akapen-red: #c0392b; /* 添削専用色（既存スタイル互換） */
+  --akapen-red-highlight: rgba(192, 57, 43, 0.2); /* コメント対象の蛍光ペン背景（akapen-red の半透明） */
+  --banner-warn-surface: #fff8e1;
+  --banner-alert-surface: #fdecea;
+  --banner-alert-border: #e5b8b2;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-critic: var(--font-body); /* 添削フォント（多言語化はここを切り替える） */
+  --red: #FE3939;       /* 添削色（plan18 T20 トークン） */
+  --highlight: #FFEBEB; /* コメント蛍光ペン背景（plan18 T20 トークン） */
+  --rounded-sm: 4px;
+  --rounded-md: 6px;
+  --rounded-lg: 10px;
+  --note-column: 200px; /* 右ペインの欄外注列（preview 時に常時確保） */
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.akapen-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+/* --- 操作部品の共通（ghost ボタン・入力）。赤を使わない --- */
+.akapen-app button {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  padding: 5px 14px;
+  min-height: 30px;
+  cursor: pointer;
+  transition-property: background-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.akapen-app button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.akapen-app button:active:not(:disabled) {
+  background: #eceae5; /* 押下＝hover より半歩濃く（scale は使わない＝静かな道具感） */
+}
+
+.akapen-app button:focus-visible,
+.akapen-app input:focus-visible,
+.akapen-app textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.akapen-app button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.akapen-app input[type='text'],
+.akapen-app textarea {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  padding: 5px 10px;
+  min-height: 30px;
+  box-sizing: border-box;
+}
+
+.akapen-app textarea {
+  resize: vertical;
+}
+
+.akapen-app input[type='text']::placeholder,
+.akapen-app textarea::placeholder {
+  color: var(--ink-subtle);
+}
+
+/* --- ツールバー（開く/完了＋全体指示欄＋右上の表示モード切替・1段 48px 帯） --- */
+.akapen-toolbar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.akapen-toolbar [data-action='save'] {
+  font-weight: 600; /* 「保存」を半歩前へ（色は増やさない） */
+}
+
+/* K5: undo/redo を結合セグメントとして表示（隙間なし・共有ボーダー） */
+.akapen-toolbar__undoredo {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.akapen-toolbar__undoredo [data-action='undo'],
+.akapen-toolbar__undoredo [data-action='redo'] {
+  width: 30px;
+  padding: 4px 0;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 0;
+}
+
+.akapen-toolbar__undoredo [data-action='undo'] {
+  border-radius: 7px 0 0 7px;
+}
+
+.akapen-toolbar__undoredo [data-action='redo'] {
+  border-radius: 0 7px 7px 0;
+  margin-left: -1px; /* ボーダーを1本に見せる */
+}
+
+.akapen-global-note {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 30px;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.akapen-global-note input,
+.akapen-global-note textarea {
+  width: 100%;
+}
+
+.akapen-global-note textarea {
+  min-height: 92px;
+}
+
+.akapen-global-note.is-expanded {
+  flex-basis: 100%;
+  order: 3;
+}
+
+.akapen-global-note [data-action='global-note-toggle'] {
+  min-width: 0;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.akapen-tooltip {
+  position: absolute;
+  z-index: 260;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 6px 9px;
+  color: var(--surface);
+  background: var(--ink);
+  border-radius: var(--rounded-sm);
+  box-shadow: 0 4px 12px rgba(28, 28, 28, 0.18);
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  white-space: normal;
+}
+
+.akapen-shortcuts-button {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 180;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(28, 28, 28, 0.12);
+}
+
+.akapen-shortcuts-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0 0 56px 12px;
+  pointer-events: none;
+}
+
+.akapen-shortcuts-panel[hidden] {
+  display: none;
+}
+
+.akapen-shortcuts-panel__card {
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(640px, calc(100vh - 84px));
+  overflow: auto;
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-md);
+  box-shadow: 0 10px 32px rgba(28, 28, 28, 0.18);
+  padding: 14px;
+}
+
+.akapen-shortcuts-panel__header,
+.akapen-shortcuts-panel__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.akapen-shortcuts-panel__header h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.akapen-shortcuts-panel__header [data-action='shortcut-close'] {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.akapen-shortcuts-panel__warning {
+  margin-top: 10px;
+  padding: 7px 9px;
+  background: var(--banner-warn-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.akapen-shortcuts-panel__list {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.akapen-shortcuts-panel__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.akapen-shortcuts-panel__label {
+  min-width: 0;
+  font-size: 13px;
+}
+
+.akapen-shortcuts-panel__row [data-role='shortcut-binding'] {
+  width: 132px;
+  padding-inline: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.akapen-shortcuts-panel__row [data-role='shortcut-binding'].is-capturing {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.akapen-shortcuts-panel__actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* K7: パネル内セクション見出し */
+.akapen-shortcuts-panel__section-title {
+  font-size: 12px;
+  color: var(--ink-subtle);
+  letter-spacing: 0.05em;
+  margin: 0 0 10px;
+}
+
+/* K7: セクション区切り線 */
+.akapen-shortcuts-panel__sep {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 14px 0;
+}
+
+/* K7: 文字サイズ行 */
+.akapen-fontsize-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* K7: スライダー＋目盛りラップ */
+.akapen-fontsize-slider-wrap {
+  flex: 1;
+}
+
+.akapen-fontsize-range {
+  width: 100%;
+  accent-color: var(--akapen-red);
+  margin: 0;
+  display: block;
+}
+
+/* K7: 目盛り（実位置連動・線形: pos=(v-50)/(200-50)） */
+.akapen-fontsize-marks {
+  position: relative;
+  height: 16px;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--ink-subtle);
+}
+
+.akapen-fontsize-marks span {
+  position: absolute;
+  white-space: nowrap;
+}
+
+.akapen-fontsize-mark--min {
+  left: 0%;
+  transform: translateX(0);
+}
+
+.akapen-fontsize-mark--mid {
+  left: 33.33%;
+  transform: translateX(-50%);
+}
+
+.akapen-fontsize-mark--max {
+  left: 100%;
+  transform: translateX(-100%);
+}
+
+/* K7: %入力＝左に▲▼ステッパーが隙間なし結合 */
+.akapen-fontsize-pct {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.akapen-fontsize-stepper {
+  display: flex;
+  flex-direction: column;
+}
+
+.akapen-fontsize-stepper button {
+  width: 22px;
+  height: 15px;
+  padding: 0;
+  min-height: 0;
+  line-height: 1;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.akapen-fontsize-stepper button:first-child {
+  border-radius: 5px 0 0 0;
+}
+
+.akapen-fontsize-stepper button:last-child {
+  border-radius: 0 0 0 5px;
+  border-top: none;
+}
+
+.akapen-fontsize-input {
+  width: 56px !important;
+  height: 30px !important;
+  min-height: 0 !important;
+  border-left: none !important;
+  border-radius: 0 7px 7px 0 !important;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px !important;
+}
+
+/* K7: デフォルトに戻すボタン */
+.akapen-fontsize-reset {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 右上グループ（F7 表示モード切替。F5 の見出しプルダウンもここに並べる置き場） */
+.akapen-toolbar__right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+  flex: none;
+}
+
+/* F5: 見出しプルダウン（アウトラインジャンプ）＝ghost 系の select。赤は使わない */
+.akapen-toolbar select[data-role='outline-jump'] {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  padding: 4px 8px;
+  min-height: 30px;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.akapen-toolbar select[data-role='outline-jump']:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.akapen-toolbar select[data-role='outline-jump']:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* セグメント切替（ビュワー/原文）＝押下中の片方を ink 反転で常時明示 */
+.akapen-view-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  /* 同心円角丸: 外側 = 内側ボタン 4px + padding 2px */
+  border-radius: calc(var(--rounded-sm) + 2px);
+}
+
+.akapen-app .akapen-view-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.akapen-app .akapen-view-switch button svg {
+  flex: none;
+}
+
+.akapen-app .akapen-view-switch button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.akapen-app .akapen-view-switch button.is-active,
+.akapen-app .akapen-view-switch button.is-active:hover:not(:disabled),
+.akapen-app .akapen-view-switch button.is-active:active:not(:disabled) {
+  background: var(--ink);
+  color: var(--surface);
+  cursor: default;
+}
+
+/* --- バナー（ガード②=黄／ガード③=赤系の淡い色面・文字は ink） --- */
+.akapen-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+.akapen-banner__text {
+  flex: 1;
+  text-wrap: pretty;
+}
+
+.akapen-banner--conflict {
+  background: var(--banner-warn-surface);
+}
+
+.akapen-banner--base-changed {
+  background: var(--banner-alert-surface);
+  border-bottom-color: var(--banner-alert-border);
+}
+
+.akapen-banner--autosave-failed {
+  background: var(--banner-alert-surface);
+  border-bottom-color: var(--banner-alert-border);
+}
+
+.akapen-banner--warning {
+  background: var(--banner-warn-surface);
+}
+
+.akapen-repair-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+
+.akapen-repair-modal__panel {
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px 22px;
+  background: var(--surface);
+  border-radius: var(--rounded-md);
+  box-shadow: 0 8px 28px rgba(28, 28, 28, 0.18);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.akapen-repair-modal__panel h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.akapen-repair-modal__panel ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.akapen-repair-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* --- 2ペイン --- */
+.akapen-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* K2: 2ペインを常に 50:50 固定（ドラッグ調整廃止）。
+   grid の 1fr 1fr で均等分割＝縮小時も均等のまま縮む。
+   divider は grid の列間を 1px 幅の固定線として表現する。
+   min-height: 0 / overflow: hidden は flex 親（.akapen-main）からの
+   高さ拘束を grid に通すために必須。これがないと grid items が
+   高さ 0 になり inner pane-body の overflow: auto が効かない。
+   flex: 1 は取り残しではない＝親 .akapen-main（flex コンテナ）の中で
+   workspace 自身が伸びるための指定（grid は中の分割の話・併存が正）。 */
+.akapen-workspace {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.akapen-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+/* K2: センターラインは固定の境界線のみ（ドラッグ不可・カーソル変化なし） */
+.akapen-divider {
+  background: var(--line);
+  /* cursor・touch-action・user-select は削除（掴めない） */
+}
+
+/* K4: ペインヘッダ共通 */
+.akapen-pane-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--line);
+}
+
+/* K4: 元データ側ヘッダ＝グレー地・ミュートカラー（触れない感） */
+.akapen-pane-title--base {
+  color: var(--ink-subtle);
+  background: #f1efea;
+}
+
+/* K4: 作業エリア側ヘッダ＝白地・太字・赤の下線（赤ペンを入れる側） */
+.akapen-pane-title--working {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--surface);
+  box-shadow: inset 0 -2px 0 var(--akapen-red);
+}
+
+/* K7: font-size は --font-zoom で制御（setZoom で :root の CSS 変数を更新） */
+.akapen-pane-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 24px;
+  font-size: calc(16px * var(--font-zoom, 1));
+  line-height: 1.8;
+}
+
+/* K4: 元データ側の本文背景をわずかにグレー（触れない感） */
+.akapen-pane--base .akapen-pane-body {
+  background: #fbfaf8;
+  scrollbar-width: none; /* Firefox */
+}
+
+/* v1.1.2: 左ペイン（ベース）のスクロールバーを非表示（ホイール操作と同期は維持）。
+   右ペインの1本だけを表示し、真ん中に見えていたバーを消す。 */
+.akapen-pane--base .akapen-pane-body::-webkit-scrollbar {
+  display: none; /* Chrome / Safari / Electron（WebKit ベース） */
+}
+
+/* plan15 C-4: has-margin-notes は廃止（右マージン常時表示の終了）。
+   旧 .akapen-pane-body.has-margin-notes { padding-right: calc(var(--note-column) + 16px); } */
+
+.akapen-editor .ProseMirror {
+  outline: none;
+}
+
+/* Milkdown の soft line break は inline span + 半角スペースで描画されるため、
+   表示層だけ block 化して source の行削除結果を詰めずに見せる。 */
+.akapen-editor .ProseMirror span[data-type='hardbreak'][data-is-inline='true'] {
+  display: block;
+  height: 0;
+  overflow: hidden;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+/* --- 空状態（中央1文＋開くボタン＋再開リスト） --- */
+.akapen-empty {
+  margin: auto;
+  max-width: 420px;
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-subtle);
+  font-size: 14px;
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+.akapen-empty [data-action='empty-open'] {
+  margin-top: 12px;
+  padding: 8px 22px;
+  font-weight: 600;
+}
+
+.akapen-resume-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.akapen-resume-list li + li {
+  margin-top: 6px;
+}
+
+.akapen-resume-list button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  font-variant-numeric: tabular-nums; /* 保存日時の桁ゆれを防ぐ */
+}
+
+/* --- 選択ポップオーバー（3操作＋F8 整形の入口・浮くものだけ影） --- */
+.akapen-popover {
+  position: absolute;
+  z-index: 20;
+  display: none;
+  /* v1.1 F8: 1行目＝3操作・2行目＝Markdown 整形（H1/H2/H3/太字/箇条書き） */
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  /* 同心円角丸: 外側 = 内側ボタン 4px + padding 4px */
+  border-radius: calc(var(--rounded-sm) + 4px);
+  box-shadow: 0 2px 10px rgba(28, 28, 28, 0.14);
+}
+
+.akapen-popover.is-open {
+  display: flex;
+  animation: akapen-pop-enter 120ms ease-out;
+}
+
+.akapen-popover__row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.akapen-popover__format {
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+
+.akapen-popover__format button {
+  min-width: 34px;
+  padding: 3px 8px;
+}
+
+.akapen-popover__format [data-action='popover-bold'] {
+  font-weight: 700;
+}
+
+@keyframes akapen-pop-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.akapen-popover button {
+  border-color: transparent;
+  min-height: 28px;
+  padding: 3px 10px;
+}
+
+.akapen-popover button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+/* plan15 追加修正 B: 削除マーク内選択時の「コメント」ボタン disabled グレーアウト */
+.akapen-popover button[disabled],
+.akapen-popover button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  color: var(--ink-subtle);
+}
+
+.akapen-popover__comment {
+  display: none;
+  gap: 4px;
+}
+
+.akapen-popover__comment.is-open {
+  display: inline-flex;
+}
+
+.akapen-popover__comment input {
+  min-height: 28px;
+  width: 180px;
+}
+
+/*
+ * --- 添削マークの意匠（赤＝添削専用・システムフォント統一） ---
+ * 基本値は editor/critic.css（milkdown.ts が import）。ここはトークンで最終確定する。
+ */
+.critic-deletion {
+  color: var(--akapen-red);
+  text-decoration: line-through;
+}
+
+.critic-insertion {
+  color: var(--akapen-red);
+  font-family: var(--font-critic);
+  text-decoration: none;
+}
+
+/* コメント対象＝蛍光ペン（赤系半透明の背景・文字は本文の ink のまま。v1.1 F3 で赤下線から変更） */
+mark.critic-highlight {
+  background: var(--akapen-red-highlight);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* コメント本文＝データ保持用。終点だけを `※` で示し、本文はポップアップで読む。 */
+span.critic-comment {
+  display: inline;
+  font-size: 0;
+  vertical-align: baseline;
+}
+
+span.critic-comment::before {
+  color: var(--akapen-red);
+  content: '※';
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  margin: 0 2px;
+  vertical-align: super;
+}
+
+/* plan15 C-4: 旧 hover 吹き出し CSS 廃止（comment-popup.ts による DOM ポップアップに移行）
+   旧:
+   mark.critic-highlight:hover + span.critic-comment,
+   span.critic-comment:hover { font-size: 13px; ... }
+*/
+
+/*
+ * --- v1.1 F6: 原文モード（CM6）の赤ペン表示（基本値は editor/critic.css・ここはトークンで最終確定） ---
+ * 記号は装飾で非表示＝データは生記法のまま。意匠は preview の critic-* と同期。
+ * フォントはシステムフォント（--font-critic = --font-body）。
+ */
+.cm-critic-deletion {
+  color: var(--akapen-red);
+  text-decoration: line-through;
+}
+
+.cm-critic-insertion {
+  color: var(--akapen-red);
+  font-family: var(--font-critic);
+}
+
+/* 指示＝赤注記（source には欄外注が無いため本文中に赤字＋淡い赤地のピルで見せる） */
+.cm-critic-comment {
+  color: var(--akapen-red);
+  font-family: var(--font-critic);
+  background: rgba(192, 57, 43, 0.08);
+  border-radius: var(--rounded-sm);
+  padding: 0 3px;
+}
+
+.cm-critic-highlight {
+  background: var(--akapen-red-highlight);
+  color: inherit;
+}
+
+.cm-critic-hidden {
+  display: none;
+}
+
+/*
+ * plan20 T14（HLD v3 §5.6）: source モードのコメント装飾は preview と完全同一の
+ *   「蛍光ペン + ホバー popup」（蛍光ペンは cm-critic-highlight と共有・本 class はクリック target）。
+ */
+.akapen-source-comment-highlight {
+  cursor: pointer;
+}
+
+.akapen-source-comment-marker {
+  color: var(--akapen-red);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  margin: 0 2px;
+  vertical-align: super;
+}
+
+/* F6: source モードのポップオーバーは削除/コメントだけ（解除系・整形は preview 専用） */
+/* plan15 C-2: popover-remove 廃止 → popover-remove-deletion / popover-remove-comment に更新 */
+.akapen-popover.is-source [data-action='popover-remove-deletion'],
+.akapen-popover.is-source [data-action='popover-remove-comment'],
+.akapen-popover.is-source .akapen-popover__format {
+  display: none;
+}
+
+/* plan15 C-4: 右マージン欄外注 CSS 廃止（margin-notes.ts の DOM 描画停止に伴い不要化）
+   旧: .akapen-margin-notes / .akapen-margin-note / .akapen-leader-lines / .akapen-leader-lines line */
+
+/* --- plan15 C-4: コメント編集ポップアップ（comment-popup.ts） --- */
+/* plan15 修正E: PopOver と同テイスト（白背景・薄影・角丸・var(--line) ボーダー）に統一 */
+.akapen-comment-popup {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  max-width: 260px;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--rounded-sm) + 4px);
+  box-shadow: 0 2px 10px rgba(28, 28, 28, 0.14);
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--ink);
+  pointer-events: none; /* is-open で auto に切替 */
+}
+
+.akapen-comment-popup.is-open {
+  display: block;
+  pointer-events: auto;
+  animation: akapen-pop-enter 120ms ease-out;
+}
+
+.akapen-comment-popup__preview {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--ink-subtle);
+}
+
+.akapen-comment-popup.is-edit .akapen-comment-popup__preview {
+  display: none;
+}
+
+.akapen-comment-popup__input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  padding: 3px 6px;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  outline: none;
+}
+
+.akapen-comment-popup__input:focus {
+  border-color: var(--ink-subtle);
+  outline: 2px solid rgba(28, 28, 28, 0.12);
+  outline-offset: 1px;
+}
+
+.akapen-comment-popup__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+
+/* 確定ボタン: PopOver ボタン群と同サイズ・ink 塗り */
+.akapen-comment-popup__confirm {
+  font-size: 12px;
+  padding: 3px 10px;
+  min-height: 28px;
+  border-radius: var(--rounded-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.akapen-comment-popup__confirm:hover {
+  opacity: 0.85;
+}
+
+/* コメント削除ボタン: PopOver の控えめボタンと同テイスト */
+.akapen-comment-popup__remove {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 3px 10px;
+  min-height: 28px;
+  border-radius: var(--rounded-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink-subtle);
+}
+
+.akapen-comment-popup__remove:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+/* --- 完了パネル（暗幕＋カード） --- */
+.akapen-complete-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+
+.akapen-complete-panel__card {
+  max-width: 520px;
+  padding: 24px 28px;
+  background: var(--surface);
+  border-radius: var(--rounded-lg);
+  box-shadow: 0 8px 28px rgba(28, 28, 28, 0.18);
+  font-size: 14px;
+  line-height: 1.7;
+  animation: akapen-panel-enter 160ms ease-out;
+}
+
+@keyframes akapen-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.akapen-complete-panel__card h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  line-height: 1.4;
+  text-wrap: balance;
+}
+
+.akapen-complete-panel__path {
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  padding: 8px 10px;
+}
+
+.akapen-complete-panel__message {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  padding: 8px 10px;
+}
+
+.akapen-complete-panel__note {
+  color: var(--ink-subtle);
+}
+
+/* --- ドラッグ中のドロップ枠（D&D の操作状態） --- */
+.akapen-app.is-dragging::after {
+  content: '.md ファイルをここにドロップ';
+  position: fixed;
+  inset: 8px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--ink-subtle);
+  border-radius: var(--rounded-md);
+  background: rgba(251, 251, 250, 0.85);
+  color: var(--ink-subtle);
+  font-size: 15px;
+  pointer-events: none;
+}
+
+/* ===== G6: 保存グループ（「保存」ボタン + 「▼」ドロップダウン） ===== */
+.akapen-toolbar__save-group {
+  position: relative;
+  display: inline-flex;
+  gap: 0;
+}
+
+.akapen-toolbar__save-group [data-action='save'] {
+  font-weight: 600;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.akapen-toolbar__save-group [data-action='save-as-toggle'] {
+  padding: 4px 7px;
+  min-width: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(0,0,0,0.15);
+  font-size: 11px;
+}
+
+.akapen-save-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+  z-index: 200;
+}
+
+.akapen-save-dropdown li button {
+  width: 100%;
+  text-align: left;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+  border-radius: 0;
+}
+
+.akapen-save-dropdown li button:hover {
+  background: var(--surface-hover);
+}
+
+/* ===== G4: TOC トグルボタン ===== */
+.akapen-toc-toggle {
+  font-size: 13px;
+  padding: 4px 9px;
+}
+
+/* ===== G4: TOC スライドパネル ===== */
+.akapen-toc-panel {
+  position: fixed;
+  top: 0;
+  right: -280px; /* 初期は画面外 */
+  width: 260px;
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  transition: right 0.22s ease;
+  z-index: 150;
+  overflow: hidden;
+}
+
+.akapen-toc-panel.is-open {
+  right: 0;
+}
+
+.akapen-toc-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 10px 16px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.akapen-toc-panel__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.akapen-toc-panel__close {
+  font-size: 13px;
+  padding: 2px 7px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  cursor: pointer;
+  color: var(--ink-subtle);
+  line-height: 1.5;
+}
+
+.akapen-toc-panel__close:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.akapen-toc-panel__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.akapen-toc-panel__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* H1/H2/H3 の階層インデント */
+.akapen-toc-item--h1 { padding-left: 10px; }
+.akapen-toc-item--h2 { padding-left: 26px; }
+.akapen-toc-item--h3 { padding-left: 42px; }
+
+.akapen-toc-item button {
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+  border-radius: var(--rounded-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.akapen-toc-item button:hover {
+  background: var(--surface-hover);
+}
+
+/* ===== G5: CM6 行番号・ファントム空行 ===== */
+.cm-lineNumbers .cm-gutterElement {
+  color: var(--ink-subtle);
+  font-size: 11px;
+  padding-right: 8px;
+  min-width: 32px;
+  text-align: right;
+}
+
+.cm-line {
+  border-bottom: 1px solid transparent; /* 行間の薄い仕切り（hover 時など将来の拡張用） */
+}
+
+.cm-alignment-phantom {
+  display: block;
+  height: 1.5em; /* 標準行と同じ高さ */
+  pointer-events: none;
+  user-select: none;
+  color: transparent;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(0,0,0,0.03) 4px,
+    rgba(0,0,0,0.03) 8px
+  );
+}
+
+/* ============================================================
+ * K3.5 段階3（plan8）: ビュワー整形効果表示
+ *   - 整形記号 `**`/`## `/`- ` を画面から隠す（doc は不変・atomicRanges でキャレット侵入も防ぐ）
+ *   - 効果（太字/見出し/箇条書き/解除）を赤（--akapen-red）で被せる
+ *   - 由来: spikes/k35-spike/format-view-spike/src/format-display.css（37 行）
+ * ============================================================ */
+.fx-symbol-hidden {
+  display: none;
+}
+
+.fx-red {
+  color: var(--akapen-red, #c0392b);
+}
+
+.fx-bold {
+  font-weight: 700;
+}
+
+.fx-heading {
+  font-weight: 700;
+  font-size: 1.4em;
+}
+
+.fx-bullet::before {
+  content: '• ';
+  color: var(--akapen-red, #c0392b);
+}
+
+/* 解除（既存 ** の太字外し）＝太字を付けず『外れた』を控えめ赤下線で示す */
+.fx-unbold {
+  font-weight: 400;
+  text-decoration: underline dotted var(--akapen-red, #c0392b);
+}
+
+/* plan14 B-2: .akapen-removed-insertion は plan15 C-5 で撤去（format-display.ts の B-2 機能撤去と同時）。 */
+
+/* K3.5 段階2（plan7）: 画面下ステータス行 ---------------------------------- */
+.akapen-statusbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  min-height: 1.6rem; /* 空のときも領域を確保して画面が揺れない */
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-subtle);
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  pointer-events: none; /* クリックをエディターに透過 */
+  z-index: 100;
+}
