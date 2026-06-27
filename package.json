@@ -4,7 +4,7 @@
   "description": "AkaPen markdown review editor for local browser use",
   "type": "module",
   "bin": {
-    "akapen": "./dist/cli.js"
+    "akapen": "dist/cli.js"
   },
   "files": [
     "dist",
