@@ -9,6 +9,48 @@
  *
  * plan15 C-4: 右マージン常時表示（akapen-margin-notes）廃止と同時に本ポップアップを有効化。
  */
+import { getLanguage, onLanguageChange, t } from '../i18n';
+import {
+  appendTemplateText,
+  getCommentTemplateText,
+  isCommentTemplateFeatureUnlocked,
+  loadCommentTemplates,
+  recordCommentTemplateUsage,
+  type CommentTemplate,
+} from './comment-templates';
+import {
+  openTemplateSelector,
+  TEMPLATE_SELECTOR_CLASS,
+  type TemplateSelectorHandle,
+} from './template-selector';
+
+export const COMMENT_TEMPLATE_BUTTON_CLASS = 'akapen-comment-popup__template-button';
+
+const POPUP_VIEWPORT_GAP = 12;
+const POPUP_OFFSET_Y = 4;
+const TEMPLATE_BUTTON_CHEVRON_SVG = `
+          <svg class="akapen-template-button__chevron" aria-hidden="true" viewBox="0 0 12 12" focusable="false">
+            <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>`;
+
+export function buildCommentPopupHtml(): string {
+  return `
+    <div class="akapen-comment-popup__preview"></div>
+    <div class="akapen-comment-popup__edit" hidden>
+      <div class="akapen-comment-popup__input-row">
+        <input type="text" class="akapen-comment-popup__input" placeholder="${t('popover.instructionPlaceholder')}" />
+        <button type="button" class="${COMMENT_TEMPLATE_BUTTON_CLASS}" data-action="comment-template" aria-label="${t('commentTemplate.buttonTooltip')}" title="${t('commentTemplate.buttonTooltip')}">
+          <span class="akapen-template-button__label">${t('commentTemplate.button')}</span>
+${TEMPLATE_BUTTON_CHEVRON_SVG}
+        </button>
+      </div>
+      <div class="akapen-comment-popup__actions">
+        <button type="button" class="akapen-comment-popup__confirm">${t('popover.confirm')}</button>
+        <button type="button" class="akapen-comment-popup__remove">${t('commentPopup.remove')}</button>
+      </div>
+    </div>
+  `;
+}
 
 export interface CommentPopupOptions {
   /** ポップアップをマウントする親（position: relative の右ペイン本体） */
@@ -68,23 +110,25 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
   const popup = document.createElement('div');
   popup.className = 'akapen-comment-popup';
   popup.setAttribute('role', 'tooltip');
-  popup.innerHTML = `
-    <div class="akapen-comment-popup__preview"></div>
-    <div class="akapen-comment-popup__edit" hidden>
-      <input type="text" class="akapen-comment-popup__input" placeholder="添削指示" />
-      <div class="akapen-comment-popup__actions">
-        <button type="button" class="akapen-comment-popup__confirm">確定</button>
-        <button type="button" class="akapen-comment-popup__remove">コメント削除</button>
-      </div>
-    </div>
-  `;
+  popup.innerHTML = buildCommentPopupHtml();
   paneBody.appendChild(popup);
 
   const previewEl = popup.querySelector<HTMLElement>('.akapen-comment-popup__preview')!;
   const editEl = popup.querySelector<HTMLElement>('.akapen-comment-popup__edit')!;
+  const inputRowEl = popup.querySelector<HTMLElement>('.akapen-comment-popup__input-row')!;
   const inputEl = popup.querySelector<HTMLInputElement>('.akapen-comment-popup__input')!;
+  const templateBtn = popup.querySelector<HTMLButtonElement>(`.${COMMENT_TEMPLATE_BUTTON_CLASS}`)!;
   const confirmBtn = popup.querySelector<HTMLButtonElement>('.akapen-comment-popup__confirm')!;
   const removeBtn = popup.querySelector<HTMLButtonElement>('.akapen-comment-popup__remove')!;
+  const unsubscribeLanguage = onLanguageChange(() => {
+    inputEl.placeholder = t('popover.instructionPlaceholder');
+    templateBtn.querySelector<HTMLElement>('.akapen-template-button__label')!.textContent =
+      t('commentTemplate.button');
+    templateBtn.setAttribute('aria-label', t('commentTemplate.buttonTooltip'));
+    templateBtn.title = t('commentTemplate.buttonTooltip');
+    confirmBtn.textContent = t('popover.confirm');
+    removeBtn.textContent = t('commentPopup.remove');
+  });
 
   let enabled = false;
   /** 現在 hover 中の comment 要素 */
@@ -93,11 +137,86 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
   let lockedComment: HTMLElement | null = null;
   /** hover delay タイマー */
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+  let templateSelector: TemplateSelectorHandle | null = null;
+  let templates: CommentTemplate[] | null = null;
+  let templateLoading = false;
+
+  const notifyPremiumRequired = (): void => {
+    void window.dispatchEvent(
+      new CustomEvent('akapen:premium-required', {
+        detail: { feature: 'comment-templates' },
+      }),
+    );
+  };
+
+  const closeTemplateSelector = (): void => {
+    templateSelector?.close();
+    templateSelector = null;
+  };
+
+  const openTemplateSelectorFromButton = async (): Promise<void> => {
+    if (templateSelector) {
+      closeTemplateSelector();
+      inputEl.focus();
+      return;
+    }
+    if (templateLoading) return;
+    templateLoading = true;
+    templateBtn.disabled = true;
+    let unlocked = false;
+    try {
+      unlocked = await isCommentTemplateFeatureUnlocked();
+    } catch {
+      unlocked = false;
+    }
+    if (!unlocked) {
+      templateLoading = false;
+      templateBtn.disabled = false;
+      notifyPremiumRequired();
+      return;
+    }
+    try {
+      templates ??= await loadCommentTemplates();
+    } catch {
+      templates = [];
+    } finally {
+      templateLoading = false;
+      templateBtn.disabled = false;
+    }
+    if (templateSelector) return;
+    clampPopupToViewport();
+    templateSelector = openTemplateSelector({
+      templates: templates ?? [],
+      mount: popup,
+      anchor: inputRowEl,
+      widthElement: inputRowEl,
+      returnFocus: inputEl,
+    });
+    const selected = await templateSelector.result;
+    templateSelector = null;
+    if (!popup.isConnected) return;
+    if (!selected) {
+      inputEl.focus();
+      return;
+    }
+    inputEl.value = appendTemplateText(
+      inputEl.value,
+      getCommentTemplateText(selected, getLanguage()),
+    );
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    void recordCommentTemplateUsage(selected.id)
+      .then((updated) => {
+        templates = updated;
+      })
+      .catch(() => undefined);
+    inputEl.focus();
+  };
 
   // --- 状態管理 ---
 
   const hide = (): void => {
     popup.classList.remove('is-open', 'is-edit');
+    closeTemplateSelector();
     hoveredComment = null;
     lockedComment = null;
     cpEnterPending = false; // 修正 F 改: ポップアップ閉時にフラグリセット
@@ -117,9 +236,23 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
     const rect = comment.getBoundingClientRect();
     const bodyRect = paneBody.getBoundingClientRect();
     const left = rect.left - bodyRect.left + paneBody.scrollLeft;
-    const top = rect.bottom - bodyRect.top + paneBody.scrollTop + 4;
+    const top = rect.bottom - bodyRect.top + paneBody.scrollTop + POPUP_OFFSET_Y;
     popup.style.left = `${Math.max(0, left)}px`;
     popup.style.top = `${Math.max(0, top)}px`;
+  };
+
+  const clampPopupToViewport = (): void => {
+    const rect = popup.getBoundingClientRect();
+    let nextLeft = Number.parseFloat(popup.style.left) || 0;
+    let nextTop = Number.parseFloat(popup.style.top) || 0;
+    const viewportRight = window.innerWidth - POPUP_VIEWPORT_GAP;
+    const viewportBottom = window.innerHeight - POPUP_VIEWPORT_GAP;
+    if (rect.right > viewportRight) nextLeft -= rect.right - viewportRight;
+    if (rect.left < POPUP_VIEWPORT_GAP) nextLeft += POPUP_VIEWPORT_GAP - rect.left;
+    if (rect.bottom > viewportBottom) nextTop -= rect.bottom - viewportBottom;
+    if (rect.top < POPUP_VIEWPORT_GAP) nextTop += POPUP_VIEWPORT_GAP - rect.top;
+    popup.style.left = `${Math.max(0, Math.round(nextLeft))}px`;
+    popup.style.top = `${Math.max(0, Math.round(nextTop))}px`;
   };
 
   const showPreview = (comment: HTMLElement): void => {
@@ -132,6 +265,7 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
     positionBelow(comment);
     popup.classList.add('is-open');
     popup.classList.remove('is-edit');
+    clampPopupToViewport();
     hoveredComment = comment;
   };
 
@@ -140,8 +274,10 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
     inputEl.value = text;
     previewEl.textContent = text;
     editEl.hidden = false;
+    closeTemplateSelector();
     positionBelow(comment);
     popup.classList.add('is-open', 'is-edit');
+    clampPopupToViewport();
     lockedComment = comment;
     hoveredComment = null;
     // mousedown preventDefault で PM 選択が失われるのを防いでいるが、
@@ -179,6 +315,10 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
     e.preventDefault();
   });
 
+  templateBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void openTemplateSelectorFromButton();
+  });
   confirmBtn.addEventListener('click', confirmEdit);
   removeBtn.addEventListener('click', removeComment);
 
@@ -269,6 +409,11 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
   // H5: capture フラグを true で統一（bubble 側は使わない）。
   const onDocumentCapture = (e: MouseEvent): void => {
     if (!enabled || !lockedComment) return;
+    if (
+      e.target instanceof HTMLElement &&
+      e.target.closest(`.${TEMPLATE_SELECTOR_CLASS}`)
+    )
+      return;
     if (editorRoot.contains(e.target as Node) || popup.contains(e.target as Node)) return;
     // editorRoot の外をクリック → 確定
     confirmEdit();
@@ -287,12 +432,14 @@ export function createCommentPopup(options: CommentPopupOptions): CommentPopupHa
       if (!next) hide();
     },
     destroy(): void {
+      unsubscribeLanguage();
       editorRoot.removeEventListener('mouseover', onMouseover);
       editorRoot.removeEventListener('mouseout', onMouseout);
       editorRoot.removeEventListener('click', onEditorRootClick, true); // H5: capture 統一
       popup.removeEventListener('mouseout', onPopupMouseout);
       document.removeEventListener('click', onDocumentCapture, true); // H5: capture 統一
       if (hoverTimer !== null) clearTimeout(hoverTimer);
+      closeTemplateSelector();
       popup.remove();
     },
   };

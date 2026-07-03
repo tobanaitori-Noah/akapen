@@ -291,6 +291,7 @@ function normalizeInsertionAnchors(
 ): ReviewAnnotation[] {
   return annotations.map((annotation) => {
     if (annotation.type !== "insertion") return annotation;
+    if (annotation.source === "source") return annotation;
     const baseOffset = safeInsertionOffset(baseMd, annotation.anchor.baseOffset);
     if (baseOffset === annotation.anchor.baseOffset) return annotation;
     return {
@@ -406,6 +407,7 @@ export function buildCriticProjection(
         .at(-1)
         ?.trim();
       if (/^\{--[\s\S]*--\}$/.test(previousContentLine ?? "")) return;
+      if (previousContentLine === "++}") return;
       append("\n", "markup", baseOffset, 0);
     }
   };

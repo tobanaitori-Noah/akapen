@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 function createDialog(className = 'akapen-web-dialog'): HTMLDialogElement {
   const dialog = document.createElement('dialog');
   dialog.className = className;
@@ -63,10 +65,10 @@ export function showConfirmDialog(message: string, detail?: string): Promise<boo
     actions.className = 'akapen-web-dialog-actions';
     const cancel = document.createElement('button');
     cancel.value = 'cancel';
-    cancel.textContent = 'キャンセル';
+    cancel.textContent = t('dialog.cancel');
     const ok = document.createElement('button');
     ok.value = 'ok';
-    ok.textContent = 'OK';
+    ok.textContent = t('dialog.ok');
     ok.dataset.primary = 'true';
     ok.autofocus = true;
     actions.append(cancel, ok);
@@ -134,7 +136,7 @@ export function showErrorDialog(message: string, detail?: string): Promise<void>
     actions.className = 'akapen-web-dialog-actions';
     const ok = document.createElement('button');
     ok.value = 'ok';
-    ok.textContent = 'OK';
+    ok.textContent = t('dialog.ok');
     ok.dataset.primary = 'true';
     ok.autofocus = true;
     actions.appendChild(ok);

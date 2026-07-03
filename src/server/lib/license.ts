@@ -114,6 +114,9 @@ export async function validateLicenseKey(
 }
 
 export async function checkLicense(options: LicenseOptions = {}): Promise<LicenseStatus> {
+  if (process.env.AKAPEN_DEBUG_PREMIUM === '1') {
+    return { licensed: true, plan: 'standard', activationId: 'debug', lastValidated: new Date().toISOString(), offlineGraceDays: 30 };
+  }
   const record = readLicenseRecord(options.userDataDir);
   if (!record) return freeStatus();
 

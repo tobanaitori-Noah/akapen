@@ -5,28 +5,85 @@
  * 添削マークと欄外注はシステムフォント（--font-body）で統一（plan18 T20）。
  */
 :root {
-  --bg: #fbfbfa;
-  --surface: #ffffff;
-  --surface-hover: #f2f0ec;
-  --ink: #1c1c1c;
-  --ink-subtle: #6b6b6b;
-  --line: #e4e2de;
-  --focus-ring: rgba(28, 28, 28, 0.4);
+  --akapen-bg: #fafafa;
+  --akapen-surface: #f0f0f2;
+  --akapen-surface-hover: rgba(0, 0, 0, 0.06);
+  --akapen-surface-active: rgba(0, 0, 0, 0.1);
+  --akapen-text: rgba(0, 0, 0, 0.87);
+  --akapen-text-muted: rgba(0, 0, 0, 0.5);
+  --akapen-text-disabled: rgba(0, 0, 0, 0.25);
+  --akapen-border: rgba(0, 0, 0, 0.08);
+  --akapen-pane-muted: #f0f0f2;
+  --akapen-pane-muted-body: #fafafa;
+  --akapen-overlay-surface: rgba(250, 250, 250, 0.82);
+  --akapen-glass-surface: rgba(240, 240, 242, 0.82);
+  --akapen-glass-line: rgba(0, 0, 0, 0.08);
+  --akapen-divider-line: rgba(0, 0, 0, 0.08);
+  --akapen-tab-muted: rgba(0, 0, 0, 0.5);
+  --akapen-tab-add: rgba(0, 0, 0, 0.3);
+  --akapen-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --akapen-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --akapen-shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.16);
+  --akapen-shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.16);
+  --akapen-accent: #c83c3c;
+  --akapen-accent-hover: #b43434;
+  --bg: var(--akapen-bg);
+  --surface: var(--akapen-surface);
+  --surface-hover: var(--akapen-surface-hover);
+  --surface-active: var(--akapen-surface-active);
+  --ink: var(--akapen-text);
+  --ink-subtle: var(--akapen-text-muted);
+  --line: var(--akapen-border);
+  --focus-ring: rgba(200, 60, 60, 0.5);
   --scrim: rgba(28, 28, 28, 0.32);
-  --akapen-red: #c0392b; /* 添削専用色（既存スタイル互換） */
-  --akapen-red-highlight: rgba(192, 57, 43, 0.2); /* コメント対象の蛍光ペン背景（akapen-red の半透明） */
+  --akapen-red: #c83c3c; /* 添削専用色（既存スタイル互換） */
+  --akapen-red-highlight: rgba(200, 60, 60, 0.18); /* コメント対象の蛍光ペン背景（akapen-red の半透明） */
+  --akapen-red-soft: rgba(200, 60, 60, 0.08);
   --banner-warn-surface: #fff8e1;
   --banner-alert-surface: #fdecea;
   --banner-alert-border: #e5b8b2;
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  --font-body: "Noto Sans JP", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-critic: var(--font-body); /* 添削フォント（多言語化はここを切り替える） */
-  --red: #FE3939;       /* 添削色（plan18 T20 トークン） */
-  --highlight: #FFEBEB; /* コメント蛍光ペン背景（plan18 T20 トークン） */
+  --red: #c83c3c;       /* 添削色（plan18 T20 トークン） */
+  --highlight: rgba(200, 60, 60, 0.18); /* コメント蛍光ペン背景（plan18 T20 トークン） */
   --rounded-sm: 4px;
   --rounded-md: 6px;
   --rounded-lg: 10px;
   --note-column: 200px; /* 右ペインの欄外注列（preview 時に常時確保） */
+}
+
+:root[data-theme='dark'] {
+  --akapen-bg: #1a1a1e;
+  --akapen-surface: #222226;
+  --akapen-surface-hover: rgba(255, 255, 255, 0.06);
+  --akapen-surface-active: rgba(255, 255, 255, 0.1);
+  --akapen-text: rgba(255, 255, 255, 0.87);
+  --akapen-text-muted: rgba(255, 255, 255, 0.5);
+  --akapen-text-disabled: rgba(255, 255, 255, 0.25);
+  --akapen-border: rgba(255, 255, 255, 0.08);
+  --akapen-pane-muted: #222226;
+  --akapen-pane-muted-body: #1a1a1e;
+  --akapen-overlay-surface: rgba(26, 26, 30, 0.78);
+  --akapen-glass-surface: rgba(0, 0, 0, 0.4);
+  --akapen-glass-line: rgba(255, 255, 255, 0.08);
+  --akapen-divider-line: rgba(255, 255, 255, 0.06);
+  --akapen-tab-muted: rgba(255, 255, 255, 0.5);
+  --akapen-tab-add: rgba(255, 255, 255, 0.3);
+  --akapen-shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.26);
+  --akapen-shadow-md: 0 12px 34px rgba(0, 0, 0, 0.34);
+  --akapen-shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.42);
+  --akapen-shadow-panel: 0 24px 64px rgba(0, 0, 0, 0.42);
+  --akapen-accent: #c83c3c;
+  --akapen-accent-hover: #dc5252;
+  --focus-ring: rgba(200, 60, 60, 0.5);
+  --scrim: rgba(14, 14, 16, 0.62);
+  --akapen-red-highlight: rgba(200, 160, 50, 0.35);
+  --akapen-red-soft: rgba(200, 60, 60, 0.18);
+  --banner-warn-surface: #3a3320;
+  --banner-alert-surface: #3a2424;
+  --banner-alert-border: #694242;
+  --highlight: rgba(200, 160, 50, 0.35);
 }
 
 html {
@@ -48,6 +105,27 @@ body {
   color: var(--ink);
 }
 
+body,
+.akapen-app,
+.akapen-toolbar,
+.akapen-tabbar,
+.akapen-workspace,
+.akapen-pane,
+.akapen-pane-title,
+.akapen-pane-body,
+.akapen-divider,
+.akapen-empty,
+.akapen-banner,
+.akapen-theme-row,
+.akapen-language-row,
+.akapen-view-switch,
+.akapen-statusbar {
+  transition:
+    background-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* --- 操作部品の共通（ghost ボタン・入力）。赤を使わない --- */
 .akapen-app button {
   font: inherit;
@@ -60,9 +138,7 @@ body {
   padding: 5px 14px;
   min-height: 30px;
   cursor: pointer;
-  transition-property: background-color;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+  transition: all 0.15s ease;
 }
 
 .akapen-app button:hover:not(:disabled) {
@@ -70,7 +146,7 @@ body {
 }
 
 .akapen-app button:active:not(:disabled) {
-  background: #eceae5; /* 押下＝hover より半歩濃く（scale は使わない＝静かな道具感） */
+  background: var(--surface-active); /* 押下＝hover より半歩濃く（scale は使わない＝静かな道具感） */
 }
 
 .akapen-app button:focus-visible,
@@ -81,7 +157,8 @@ body {
 }
 
 .akapen-app button:disabled {
-  opacity: 0.4;
+  opacity: 1;
+  color: var(--akapen-text-disabled);
   cursor: default;
 }
 
@@ -108,20 +185,166 @@ body {
   color: var(--ink-subtle);
 }
 
-/* --- ツールバー（開く/完了＋全体指示欄＋右上の表示モード切替・1段 48px 帯） --- */
+/* --- ツールバー（開く/保存＋全体指示欄＋表示モード切替・44px 帯） --- */
 .akapen-toolbar {
   position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  padding: 9px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 6px 16px;
+  background: var(--akapen-glass-surface);
+  border-bottom: 1px solid var(--akapen-glass-line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
+.akapen-toolbar [data-action='open'],
 .akapen-toolbar [data-action='save'] {
+  font-size: 13px;
   font-weight: 600; /* 「保存」を半歩前へ（色は増やさない） */
+}
+
+.akapen-toolbar.is-enabling button:not(:disabled) {
+  animation: akapen-toolbar-enable 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes akapen-toolbar-enable {
+  0% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* --- タブバー（エディター下部・常時表示） --- */
+.akapen-tabbar {
+  position: fixed;
+  bottom: 1.6rem;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--akapen-glass-surface);
+  border-top: 1px solid var(--akapen-divider-line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 99;
+  isolation: isolate;
+}
+
+.akapen-tabbar__indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--akapen-red);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition:
+    transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.12s ease;
+}
+
+.akapen-tabbar__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 120px;
+  max-width: 240px;
+  height: 32px;
+  box-sizing: border-box;
+  color: var(--akapen-tab-muted);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+  z-index: 1;
+}
+
+.akapen-tabbar__tab:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.akapen-tabbar__tab.is-active {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
+  box-shadow: none;
+}
+
+.akapen-tabbar__tab.is-drag-target {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.akapen-app .akapen-tabbar__select,
+.akapen-app .akapen-tabbar__close,
+.akapen-app .akapen-tabbar__add {
+  min-height: 24px;
+  color: inherit;
+  border: none;
+  background: transparent;
+}
+
+.akapen-app .akapen-tabbar__select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.akapen-tabbar__dirty {
+  width: 12px;
+  color: var(--akapen-red);
+  text-align: center;
+  line-height: 1;
+  flex: none;
+}
+
+.akapen-app .akapen-tabbar__close {
+  width: 28px;
+  padding: 0;
+  color: var(--ink-subtle);
+  flex: none;
+}
+
+.akapen-app .akapen-tabbar__add {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--akapen-tab-add);
+  border: none;
+  border-radius: 999px;
+  flex: none;
+  font-size: 16px;
+  line-height: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.akapen-app .akapen-tabbar__add:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--surface-hover);
 }
 
 /* K5: undo/redo を結合セグメントとして表示（隙間なし・共有ボーダー） */
@@ -132,11 +355,26 @@ body {
 
 .akapen-toolbar__undoredo [data-action='undo'],
 .akapen-toolbar__undoredo [data-action='redo'] {
-  width: 30px;
-  padding: 4px 0;
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  font-size: 0;
   line-height: 1;
   border-radius: 0;
+  transform: translateX(0) scale(1);
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+  will-change: transform;
+}
+
+.akapen-toolbar__undoredo svg {
+  flex: none;
 }
 
 .akapen-toolbar__undoredo [data-action='undo'] {
@@ -146,6 +384,24 @@ body {
 .akapen-toolbar__undoredo [data-action='redo'] {
   border-radius: 0 7px 7px 0;
   margin-left: -1px; /* ボーダーを1本に見せる */
+}
+
+.akapen-toolbar__undoredo [data-action='undo']:active:not(:disabled),
+.akapen-toolbar__undoredo [data-action='undo'].is-pressing:not(:disabled) {
+  transform: translateX(-3px) scale(0.94);
+  transition: transform 0.12s cubic-bezier(0.4, 1.4, 0.7, 1);
+}
+
+.akapen-toolbar__undoredo [data-action='redo']:active:not(:disabled),
+.akapen-toolbar__undoredo [data-action='redo'].is-pressing:not(:disabled) {
+  transform: translateX(3px) scale(0.94);
+  transition: transform 0.12s cubic-bezier(0.4, 1.4, 0.7, 1);
+}
+
+.akapen-toolbar__undoredo [data-action='undo']:disabled,
+.akapen-toolbar__undoredo [data-action='redo']:disabled {
+  transform: none;
+  will-change: auto;
 }
 
 .akapen-global-note {
@@ -172,6 +428,7 @@ body {
 
 .akapen-global-note [data-action='global-note-toggle'] {
   min-width: 0;
+  width: 30px;
   padding: 4px 0;
   font-size: 11px;
 }
@@ -184,7 +441,7 @@ body {
   color: var(--surface);
   background: var(--ink);
   border-radius: var(--rounded-sm);
-  box-shadow: 0 4px 12px rgba(28, 28, 28, 0.18);
+  box-shadow: var(--akapen-shadow-lg);
   font-size: 12px;
   line-height: 1.5;
   pointer-events: none;
@@ -192,17 +449,13 @@ body {
 }
 
 .akapen-shortcuts-button {
-  position: fixed;
-  left: 12px;
-  bottom: 12px;
-  z-index: 180;
-  width: 34px;
-  min-height: 34px;
+  width: 32px;
+  min-height: 30px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(28, 28, 28, 0.12);
+  flex: none;
 }
 
 .akapen-shortcuts-panel {
@@ -210,10 +463,25 @@ body {
   inset: 0;
   z-index: 240;
   display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  padding: 0 0 56px 12px;
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 0;
+  background: rgba(0, 0, 0, 0);
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 0.2s ease-out, background-color 0.2s ease-out;
+}
+
+.akapen-shortcuts-panel.is-open {
+  background: rgba(0, 0, 0, 0.36);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.akapen-shortcuts-panel.is-closing {
+  background: rgba(0, 0, 0, 0);
+  opacity: 0;
+  pointer-events: auto;
 }
 
 .akapen-shortcuts-panel[hidden] {
@@ -221,15 +489,64 @@ body {
 }
 
 .akapen-shortcuts-panel__card {
-  width: min(420px, calc(100vw - 24px));
-  max-height: min(640px, calc(100vh - 84px));
+  width: min(420px, calc(100vw - 32px));
+  height: 100%;
+  max-height: none;
   overflow: auto;
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--rounded-md);
-  box-shadow: 0 10px 32px rgba(28, 28, 28, 0.18);
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0;
+  box-shadow: var(--akapen-shadow-panel);
   padding: 14px;
+  transform: translateX(100%);
+  transition: transform 0.2s ease-out;
+}
+
+.akapen-shortcuts-panel.is-open .akapen-shortcuts-panel__card {
+  transform: translateX(0);
+}
+
+.akapen-shortcuts-panel.is-closing .akapen-shortcuts-panel__card {
+  transform: translateX(100%);
+}
+
+.akapen-shortcuts-panel__header {
+  order: 0;
+}
+
+.akapen-settings-section[data-section='font-size'] {
+  order: 10;
+}
+
+.akapen-settings-section[data-section='theme'] {
+  order: 20;
+}
+
+.akapen-shortcuts-panel__sep[data-section='shortcuts'],
+.akapen-settings-section[data-section='shortcuts'] {
+  order: 30;
+}
+
+.akapen-shortcuts-panel__card [data-role='akapen-template-settings'] {
+  order: 40;
+}
+
+.akapen-shortcuts-panel__card [data-role='akapen-export-settings'] {
+  order: 50;
+}
+
+.akapen-shortcuts-panel__card [data-role='language-settings'] {
+  order: 60;
+}
+
+.akapen-shortcuts-panel__card [data-role='akapen-license-settings'] {
+  order: 70;
 }
 
 .akapen-shortcuts-panel__header,
@@ -267,6 +584,10 @@ body {
   border-top: 1px solid var(--line);
 }
 
+.akapen-shortcuts-panel__shortcut-content[hidden] {
+  display: none;
+}
+
 .akapen-shortcuts-panel__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 132px;
@@ -297,12 +618,76 @@ body {
   margin-top: 12px;
 }
 
+.akapen-template-settings-row,
+.akapen-export-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.akapen-template-settings-description,
+.akapen-export-settings-description {
+  min-width: 0;
+  color: var(--ink-subtle);
+  font-size: 13px;
+}
+
+.akapen-template-settings-row button,
+.akapen-export-settings-row button {
+  min-height: 34px;
+  padding: 0 12px;
+  flex: none;
+}
+
+.akapen-shortcuts-panel__section-action {
+  min-height: 30px;
+  padding: 0 12px;
+  flex: none;
+  white-space: nowrap;
+}
+
 /* K7: パネル内セクション見出し */
 .akapen-shortcuts-panel__section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--ink-subtle);
   letter-spacing: 0.05em;
   margin: 0 0 10px;
+}
+
+.akapen-shortcuts-panel__section-title::before {
+  content: '□';
+  color: var(--akapen-red);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.akapen-shortcuts-panel__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.akapen-shortcuts-panel__section-header .akapen-shortcuts-panel__section-title {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.akapen-shortcuts-panel__section-header .akapen-language-row {
+  margin-bottom: 0;
+  flex: none;
+}
+
+.akapen-shortcuts-panel__toggle {
+  min-height: 28px;
+  padding: 0 10px;
+  flex: none;
+  font-size: 12px;
 }
 
 /* K7: セクション区切り線 */
@@ -416,10 +801,82 @@ body {
   flex-shrink: 0;
 }
 
+.akapen-theme-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--rounded-sm) + 2px);
+  isolation: isolate;
+}
+
+.akapen-language-row {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--rounded-sm) + 2px);
+  isolation: isolate;
+}
+
+.akapen-theme-pill,
+.akapen-language-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: var(--rounded-sm);
+  background: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    width 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    opacity 0.12s ease;
+}
+
+.akapen-app .akapen-theme-option,
+.akapen-app .akapen-language-option {
+  position: relative;
+  z-index: 1;
+  min-height: 26px;
+  padding: 3px 12px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.akapen-app .akapen-theme-option {
+  flex: 1 1 0;
+}
+
+.akapen-app .akapen-theme-option:hover:not(:disabled),
+.akapen-app .akapen-language-option:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.akapen-app .akapen-theme-option.is-active,
+.akapen-app .akapen-theme-option.is-active:hover:not(:disabled),
+.akapen-app .akapen-theme-option.is-active:active:not(:disabled),
+.akapen-app .akapen-language-option.is-active,
+.akapen-app .akapen-language-option.is-active:hover:not(:disabled),
+.akapen-app .akapen-language-option.is-active:active:not(:disabled) {
+  background: transparent;
+  color: var(--surface);
+}
+
 /* 右上グループ（F7 表示モード切替。F5 の見出しプルダウンもここに並べる置き場） */
 .akapen-toolbar__right {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   margin-left: auto;
   flex: none;
@@ -452,22 +909,44 @@ body {
 
 /* セグメント切替（ビュワー/原文）＝押下中の片方を ink 反転で常時明示 */
 .akapen-view-switch {
+  position: relative;
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--surface-hover) 72%, transparent);
   border: 1px solid var(--line);
-  /* 同心円角丸: 外側 = 内側ボタン 4px + padding 2px */
-  border-radius: calc(var(--rounded-sm) + 2px);
+  border-radius: 999px;
+  isolation: isolate;
+}
+
+.akapen-view-switch__pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    width 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    opacity 0.12s ease;
 }
 
 .akapen-app .akapen-view-switch button {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
-  padding: 2px 10px;
+  min-height: 26px;
+  padding: 2px 11px;
   border-color: transparent;
+  border-radius: 999px;
   background: transparent;
 }
 
@@ -482,8 +961,9 @@ body {
 .akapen-app .akapen-view-switch button.is-active,
 .akapen-app .akapen-view-switch button.is-active:hover:not(:disabled),
 .akapen-app .akapen-view-switch button.is-active:active:not(:disabled) {
-  background: var(--ink);
-  color: var(--surface);
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
   cursor: default;
 }
 
@@ -537,7 +1017,7 @@ body {
   padding: 20px 22px;
   background: var(--surface);
   border-radius: var(--rounded-md);
-  box-shadow: 0 8px 28px rgba(28, 28, 28, 0.18);
+  box-shadow: var(--akapen-shadow-lg);
   font-size: 14px;
   line-height: 1.7;
 }
@@ -583,6 +1063,50 @@ body {
   overflow: hidden;
 }
 
+.akapen-workspace.is-opening .akapen-pane--base {
+  animation: akapen-pane-open-left 250ms ease-out both;
+}
+
+.akapen-workspace.is-opening .akapen-pane--working {
+  animation: akapen-pane-open-right 250ms ease-out 50ms both;
+}
+
+.akapen-workspace.is-view-switching .akapen-pane-body,
+.akapen-workspace.is-tab-switching .akapen-pane-body {
+  animation: akapen-content-fade 150ms ease;
+}
+
+@keyframes akapen-content-fade {
+  from {
+    opacity: 0.72;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes akapen-pane-open-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes akapen-pane-open-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .akapen-pane {
   display: flex;
   min-width: 0;
@@ -594,7 +1118,7 @@ body {
 
 /* K2: センターラインは固定の境界線のみ（ドラッグ不可・カーソル変化なし） */
 .akapen-divider {
-  background: var(--line);
+  background: var(--akapen-divider-line);
   /* cursor・touch-action・user-select は削除（掴めない） */
 }
 
@@ -603,25 +1127,28 @@ body {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 12px;
-  font-size: 12px;
+  height: 24px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--line);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--akapen-divider-line);
 }
 
 /* K4: 元データ側ヘッダ＝グレー地・ミュートカラー（触れない感） */
 .akapen-pane-title--base {
   color: var(--ink-subtle);
-  background: #f1efea;
+  background: var(--akapen-pane-muted-body);
 }
 
 /* K4: 作業エリア側ヘッダ＝白地・太字・赤の下線（赤ペンを入れる側） */
 .akapen-pane-title--working {
   color: var(--ink);
-  font-weight: 600;
-  background: var(--surface);
-  box-shadow: inset 0 -2px 0 var(--akapen-red);
+  font-weight: 500;
+  background: var(--akapen-pane-muted-body);
+  box-shadow: inset 0 -2px 0 rgba(200, 60, 60, 0.5);
 }
 
 /* K7: font-size は --font-zoom で制御（setZoom で :root の CSS 変数を更新） */
@@ -630,14 +1157,15 @@ body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 20px 24px;
+  padding: 32px 40px 56px;
+  font-family: var(--font-body);
   font-size: calc(16px * var(--font-zoom, 1));
   line-height: 1.8;
 }
 
 /* K4: 元データ側の本文背景をわずかにグレー（触れない感） */
 .akapen-pane--base .akapen-pane-body {
-  background: #fbfaf8;
+  background: var(--akapen-pane-muted-body);
   scrollbar-width: none; /* Firefox */
 }
 
@@ -654,6 +1182,79 @@ body {
   outline: none;
 }
 
+.akapen-editor .ProseMirror img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.akapen-editor .ProseMirror p {
+  margin: 0 0 1.2em;
+}
+
+.akapen-editor .ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+.akapen-editor .ProseMirror h1,
+.akapen-editor .ProseMirror h2,
+.akapen-editor .ProseMirror h3 {
+  margin: 2em 0 0.8em;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.akapen-editor .ProseMirror h1:first-child,
+.akapen-editor .ProseMirror h2:first-child,
+.akapen-editor .ProseMirror h3:first-child {
+  margin-top: 0;
+}
+
+.akapen-editor,
+.akapen-editor .ProseMirror,
+.akapen-editor .cm-editor,
+.akapen-editor .cm-scroller {
+  color: var(--ink);
+  background: transparent;
+}
+
+.akapen-editor .cm-editor {
+  height: 100%;
+}
+
+.akapen-editor .cm-content {
+  caret-color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.8;
+}
+
+.akapen-editor .cm-gutters {
+  color: var(--ink-subtle);
+  background: var(--akapen-pane-muted-body);
+  border-right: 1px solid var(--line);
+}
+
+.akapen-editor .cm-activeLine,
+.akapen-editor .cm-activeLineGutter {
+  background: var(--surface-hover);
+}
+
+.akapen-editor .cm-selectionBackground,
+.akapen-editor .cm-content ::selection,
+.akapen-editor .ProseMirror ::selection {
+  background: color-mix(in srgb, var(--akapen-accent) 28%, transparent);
+}
+
+:root[data-theme='dark'] .akapen-editor .cm-selectionBackground,
+:root[data-theme='dark'] .akapen-editor .cm-content::selection,
+:root[data-theme='dark'] .akapen-editor .cm-content ::selection,
+:root[data-theme='dark'] .akapen-editor .ProseMirror::selection,
+:root[data-theme='dark'] .akapen-editor .ProseMirror ::selection {
+  background: rgba(56, 120, 200, 0.45);
+  color: #fff;
+}
+
 /* Milkdown の soft line break は inline span + 半角スペースで描画されるため、
    表示層だけ block 化して source の行削除結果を詰めずに見せる。 */
 .akapen-editor .ProseMirror span[data-type='hardbreak'][data-is-inline='true'] {
@@ -666,11 +1267,11 @@ body {
   display: none !important;
 }
 
-/* --- 空状態（中央1文＋開くボタン＋再開リスト） --- */
+/* --- 空状態（ブランド、開くボタン、再開リスト） --- */
 .akapen-empty {
   margin: auto;
-  max-width: 420px;
-  padding: 24px;
+  width: min(560px, calc(100vw - 40px));
+  padding: 28px 24px 36px;
   text-align: center;
   color: var(--ink-subtle);
   font-size: 14px;
@@ -678,10 +1279,98 @@ body {
   text-wrap: pretty;
 }
 
+.akapen-empty.is-leaving {
+  animation: akapen-welcome-leave 150ms ease-out forwards;
+}
+
+.akapen-empty__brand {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin-inline: auto;
+  margin-bottom: 22px;
+}
+
+.akapen-empty__brand::after {
+  content: '';
+  position: absolute;
+  top: 36%;
+  right: 8%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 30, 30, 0.35) 0%, rgba(200, 30, 30, 0) 70%);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.9);
+  transform-origin: center;
+  animation: akapen-logo-tip-pulse 8s ease-in-out infinite;
+}
+
+.akapen-empty--intro .akapen-empty__brand::after {
+  animation-delay: 1.2s;
+}
+
+.akapen-empty__logo-wrap {
+  overflow: hidden;
+}
+
+.akapen-empty__logo-img {
+  display: block;
+  width: min(320px, 64vw);
+  height: auto;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 40%, transparent 45%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 40%, transparent 45%, transparent 100%);
+  -webkit-mask-position: 0% 0;
+  mask-position: 0% 0;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 300% 100%;
+  mask-size: 300% 100%;
+  user-select: none;
+}
+
+:root[data-theme='dark'] .akapen-empty__logo-img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.akapen-empty__tagline {
+  margin: 0;
+  color: var(--ink-subtle);
+  font-size: 15px;
+}
+
+.akapen-empty__prompt {
+  margin: 0;
+}
+
 .akapen-empty [data-action='empty-open'] {
   margin-top: 12px;
   padding: 8px 22px;
   font-weight: 600;
+  box-shadow: var(--akapen-shadow-sm);
+  transition:
+    transform 0.16s ease-out,
+    box-shadow 0.16s ease-out,
+    background-color 0.15s ease;
+}
+
+.akapen-empty [data-action='empty-open']:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--akapen-shadow-md);
+}
+
+.akapen-empty__resume {
+  margin-top: 22px;
+}
+
+.akapen-empty__resume > p {
+  margin: 0 0 8px;
+  color: var(--ink-subtle);
+  font-size: 12px;
+  text-align: left;
 }
 
 .akapen-resume-list {
@@ -696,10 +1385,106 @@ body {
 }
 
 .akapen-resume-list button {
+  position: relative;
   width: 100%;
   text-align: left;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 14px;
+  overflow: hidden;
   font-variant-numeric: tabular-nums; /* 保存日時の桁ゆれを防ぐ */
+}
+
+.akapen-resume-list button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--akapen-red);
+  transform: translateX(-5px);
+  transition: transform 0.16s ease-out;
+}
+
+.akapen-resume-list button:hover::before {
+  transform: translateX(0);
+}
+
+.akapen-empty--intro .akapen-empty__logo-img {
+  -webkit-mask-position: 100% 0;
+  mask-position: 100% 0;
+  animation: akapen-logo-mask-wipe 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.akapen-empty--intro .akapen-empty__tagline,
+.akapen-empty--intro .akapen-empty__prompt,
+.akapen-empty--intro .akapen-empty__open,
+.akapen-empty--intro .akapen-empty__resume {
+  opacity: 0;
+  animation: akapen-welcome-content-enter 0.28s ease-out forwards;
+}
+
+.akapen-empty--intro .akapen-empty__tagline {
+  animation-delay: 0.8s;
+}
+
+.akapen-empty--intro .akapen-empty__prompt {
+  animation-delay: 0.88s;
+}
+
+.akapen-empty--intro .akapen-empty__open {
+  animation-delay: 0.96s;
+}
+
+.akapen-empty--intro .akapen-empty__resume {
+  animation-delay: 1.04s;
+}
+
+@keyframes akapen-logo-mask-wipe {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+
+  to {
+    -webkit-mask-position: 0% 0;
+    mask-position: 0% 0;
+  }
+}
+
+@keyframes akapen-logo-tip-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  5% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+
+  12% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes akapen-welcome-content-enter {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes akapen-welcome-leave {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 /* --- 選択ポップオーバー（3操作＋F8 整形の入口・浮くものだけ影） --- */
@@ -711,11 +1496,13 @@ body {
   flex-direction: column;
   gap: 4px;
   padding: 4px;
-  background: var(--surface);
+  background: var(--akapen-overlay-surface);
   border: 1px solid var(--line);
-  /* 同心円角丸: 外側 = 内側ボタン 4px + padding 4px */
-  border-radius: calc(var(--rounded-sm) + 4px);
-  box-shadow: 0 2px 10px rgba(28, 28, 28, 0.14);
+  border-radius: 8px;
+  box-shadow: var(--akapen-shadow-md);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transform-origin: top left;
 }
 
 .akapen-popover.is-open {
@@ -746,11 +1533,9 @@ body {
 @keyframes akapen-pop-enter {
   from {
     opacity: 0;
-    transform: translateY(2px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -774,16 +1559,64 @@ body {
 
 .akapen-popover__comment {
   display: none;
+  flex-direction: column;
   gap: 4px;
+  min-width: min(380px, calc(100vw - 40px));
 }
 
 .akapen-popover__comment.is-open {
   display: inline-flex;
 }
 
+.akapen-popover__comment-input-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+}
+
 .akapen-popover__comment input {
   min-height: 28px;
-  width: 180px;
+  min-width: 260px;
+  width: auto;
+  flex: 1;
+}
+
+.akapen-popover__template-button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 88px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.akapen-popover.is-comment-open [data-action='popover-delete'],
+.akapen-popover.is-comment-open [data-action='popover-comment'],
+.akapen-popover.is-comment-open [data-action='popover-remove-deletion'],
+.akapen-popover.is-comment-open .akapen-popover__format {
+  display: none;
+}
+
+.akapen-popover [data-action='popover-comment-confirm'] {
+  flex: 0 0 auto;
+  min-width: 56px;
+  white-space: nowrap;
+}
+
+.akapen-comment-editing-lens {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.akapen-comment-editing-lens__segment {
+  position: absolute;
+  border-radius: 3px;
+  background: var(--akapen-red-highlight);
+  box-shadow: inset 0 -1px 0 rgba(200, 60, 60, 0.35);
 }
 
 /*
@@ -851,7 +1684,7 @@ span.critic-comment::before {
 .cm-critic-comment {
   color: var(--akapen-red);
   font-family: var(--font-critic);
-  background: rgba(192, 57, 43, 0.08);
+  background: var(--akapen-red-soft);
   border-radius: var(--rounded-sm);
   padding: 0 3px;
 }
@@ -859,6 +1692,11 @@ span.critic-comment::before {
 .cm-critic-highlight {
   background: var(--akapen-red-highlight);
   color: inherit;
+}
+
+:root[data-theme='dark'] mark.critic-highlight,
+:root[data-theme='dark'] .cm-critic-highlight {
+  background: rgba(200, 160, 50, 0.35);
 }
 
 .cm-critic-hidden {
@@ -904,7 +1742,7 @@ span.critic-comment::before {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: calc(var(--rounded-sm) + 4px);
-  box-shadow: 0 2px 10px rgba(28, 28, 28, 0.14);
+  box-shadow: var(--akapen-shadow-md);
   padding: 6px 8px;
   font-size: 13px;
   color: var(--ink);
@@ -940,9 +1778,161 @@ span.critic-comment::before {
   outline: none;
 }
 
+.akapen-comment-popup__input-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.akapen-comment-popup__template-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  width: auto;
+  min-width: 96px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  white-space: nowrap;
+}
+
+.akapen-popover__template-button {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.akapen-template-button__chevron {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  color: var(--ink-subtle);
+}
+
+.akapen-comment-popup.is-edit {
+  max-width: 420px;
+  min-width: 320px;
+}
+
+.akapen-template-selector {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+  max-height: min(408px, calc(100vh - 24px));
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--akapen-shadow-md);
+  color: var(--ink);
+  font-family: var(--font-body);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-out;
+}
+
+.akapen-template-selector.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.akapen-template-selector.is-closing {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms ease-in;
+}
+
+.akapen-template-selector__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.akapen-template-selector .akapen-template-selector__item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-height: 42px;
+  width: 100%;
+  padding: 10px 14px 10px 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  transition: background 100ms ease;
+}
+
+.akapen-template-selector .akapen-template-selector__item:first-child {
+  border-top: 0;
+}
+
+.akapen-template-selector .akapen-template-selector__item:hover,
+.akapen-template-selector .akapen-template-selector__item:focus-visible,
+.akapen-template-selector .akapen-template-selector__item.is-selected {
+  background: var(--surface-hover);
+  box-shadow: inset 3px 0 0 var(--akapen-red);
+}
+
+.akapen-template-selector .akapen-template-selector__item:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+  position: relative;
+  z-index: 1;
+}
+
+.akapen-template-selector__index {
+  color: var(--ink-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.75;
+  opacity: 0.7;
+  text-align: right;
+  user-select: none;
+}
+
+.akapen-template-selector__text {
+  overflow-wrap: anywhere;
+}
+
+.akapen-template-selector__empty {
+  padding: 14px 12px;
+  color: var(--ink-subtle);
+  font-size: 14px;
+}
+
+.akapen-template-selector__hint {
+  padding: 6px 10px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-subtle);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 .akapen-comment-popup__input:focus {
   border-color: var(--ink-subtle);
-  outline: 2px solid rgba(28, 28, 28, 0.12);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -955,14 +1945,17 @@ span.critic-comment::before {
 
 /* 確定ボタン: PopOver ボタン群と同サイズ・ink 塗り */
 .akapen-comment-popup__confirm {
+  flex: 0 0 auto;
   font-size: 12px;
   padding: 3px 10px;
+  min-width: 56px;
   min-height: 28px;
   border-radius: var(--rounded-sm);
   border: 1px solid transparent;
   cursor: pointer;
   background: var(--ink);
   color: var(--surface);
+  white-space: nowrap;
 }
 
 .akapen-comment-popup__confirm:hover {
@@ -971,20 +1964,761 @@ span.critic-comment::before {
 
 /* コメント削除ボタン: PopOver の控えめボタンと同テイスト */
 .akapen-comment-popup__remove {
+  flex: 0 0 auto;
   margin-left: auto;
   font-size: 12px;
   padding: 3px 10px;
+  min-width: 76px;
   min-height: 28px;
   border-radius: var(--rounded-sm);
   border: 1px solid transparent;
   cursor: pointer;
   background: transparent;
   color: var(--ink-subtle);
+  white-space: nowrap;
 }
 
 .akapen-comment-popup__remove:hover {
   background: var(--surface-hover);
   color: var(--ink);
+}
+
+.akapen-template-manager {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  padding: 0;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--akapen-shadow-lg);
+}
+
+.akapen-template-manager::backdrop {
+  background: var(--scrim);
+}
+
+.akapen-template-manager__body {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.akapen-template-manager__header,
+.akapen-template-manager__controls,
+.akapen-template-manager__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.akapen-template-manager__header h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.akapen-template-manager__title-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.akapen-template-manager__header [data-action='template-close'] {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.akapen-template-manager__language {
+  display: flex;
+  align-items: center;
+}
+
+.akapen-template-manager__tabs,
+.akapen-template-manager__language-switch {
+  --akapen-template-pill-fill: var(--ink);
+  --akapen-template-pill-active-text: var(--surface);
+  position: relative;
+  display: inline-flex;
+  width: fit-content;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--rounded-sm) + 2px);
+  isolation: isolate;
+}
+
+.akapen-template-manager__tab-pill,
+.akapen-template-manager__language-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: var(--rounded-sm);
+  background: var(--akapen-template-pill-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface) 14%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    width 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    opacity 0.12s ease;
+}
+
+.akapen-template-manager__tab-pill.is-ready,
+.akapen-template-manager__language-pill.is-ready {
+  opacity: 1;
+}
+
+.akapen-template-manager__tabs button,
+.akapen-template-manager__language-switch button {
+  position: relative;
+  z-index: 1;
+  min-height: 28px;
+  padding: 3px 14px;
+  color: var(--ink-subtle);
+  border-color: transparent;
+  background: transparent;
+}
+
+.akapen-template-manager__tabs button[aria-selected='true'],
+.akapen-template-manager__language-switch button.is-active {
+  color: var(--akapen-template-pill-active-text);
+  background: transparent;
+  font-weight: 600;
+}
+
+.akapen-template-manager__empty {
+  margin: 0;
+  color: var(--ink-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.akapen-template-manager__warning {
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--banner-warn-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  font-size: 12px;
+}
+
+.akapen-template-manager__list {
+  display: grid;
+  gap: 0;
+  max-height: min(500px, calc(100vh - 220px));
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-color: color-mix(in srgb, var(--ink-subtle) 32%, transparent) transparent;
+  scrollbar-width: thin;
+  background: var(--akapen-pane-muted-body);
+  border-top: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  border-radius: var(--rounded-sm);
+}
+
+.akapen-template-manager__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.akapen-template-manager__list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink-subtle) 28%, transparent);
+  border-radius: 999px;
+}
+
+.akapen-template-manager__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: start;
+  padding: 10px 0 10px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  border-radius: var(--rounded-sm);
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.akapen-template-manager__row.is-diff::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--akapen-red);
+  pointer-events: none;
+}
+
+.akapen-template-manager__row:last-child {
+  border-bottom: none;
+}
+
+.akapen-template-manager__row:hover {
+  background: color-mix(in srgb, var(--surface-hover) 70%, transparent);
+}
+
+.akapen-template-manager__editor {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.akapen-template-manager__row label {
+  display: grid;
+  gap: 0;
+  color: var(--ink-subtle);
+  font-size: 12px;
+}
+
+.akapen-template-manager__row textarea {
+  min-height: 68px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  padding: 7px 9px;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.akapen-template-manager__reference {
+  display: grid;
+  gap: 1px;
+  color: var(--ink-subtle);
+  font-size: 11px;
+  line-height: 1.42;
+}
+
+.akapen-template-manager__reference-text {
+  overflow-wrap: anywhere;
+  opacity: 0.72;
+}
+
+.akapen-template-manager__row-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  min-width: 32px;
+}
+
+.akapen-template-manager__actions {
+  justify-content: space-between;
+}
+
+.akapen-template-manager__actions-left {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+}
+
+.akapen-template-manager [data-action='template-add'],
+.akapen-template-manager .akapen-template-manager__reset-all {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 0;
+  min-height: 0;
+  color: var(--ink-subtle);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.akapen-template-manager [data-action='template-add']:hover:not(:disabled),
+.akapen-template-manager [data-action='template-add']:focus-visible,
+.akapen-template-manager [data-action='template-add']:active:not(:disabled),
+.akapen-template-manager .akapen-template-manager__reset-all:hover:not(:disabled),
+.akapen-template-manager .akapen-template-manager__reset-all:focus-visible,
+.akapen-template-manager .akapen-template-manager__reset-all:active:not(:disabled) {
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.akapen-template-manager [data-action='template-add'][hidden],
+.akapen-template-manager .akapen-template-manager__reset-all[hidden] {
+  display: none;
+}
+
+.akapen-template-manager__delete {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--ink-subtle);
+  background: transparent;
+  border-color: transparent;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.akapen-template-manager__done {
+  min-height: 28px;
+  padding: 3px 14px;
+  color: var(--akapen-accent-hover);
+  background: color-mix(in srgb, var(--akapen-red) 16%, transparent);
+  border-color: color-mix(in srgb, var(--akapen-red) 34%, transparent);
+  border-radius: calc(var(--rounded-sm) + 2px);
+  box-shadow: none;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.akapen-template-manager__done:hover:not(:disabled),
+.akapen-template-manager__done:focus-visible {
+  color: #fff;
+  background: var(--akapen-red);
+  border-color: var(--akapen-red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--akapen-red) 20%, transparent);
+}
+
+.akapen-template-manager__done:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.akapen-template-manager__done:disabled {
+  color: var(--akapen-accent-hover);
+  background: color-mix(in srgb, var(--akapen-red) 16%, transparent);
+  border-color: color-mix(in srgb, var(--akapen-red) 34%, transparent);
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+}
+
+.akapen-template-manager__done.is-pulsing {
+  animation: akapen-template-save-pulse 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes akapen-template-save-pulse {
+  0% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.akapen-export-settings-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  padding: 0;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--akapen-shadow-lg);
+}
+
+.akapen-export-settings-dialog::backdrop {
+  background: var(--scrim);
+}
+
+.akapen-web-dialog,
+.fp-dialog,
+.akapen-license-dialog,
+.akapen-plan-popup,
+.akapen-license-detail-popup,
+.akapen-template-manager,
+.akapen-export-settings-dialog {
+  opacity: 0;
+  transition:
+    opacity 150ms ease-out,
+    overlay 150ms ease-out allow-discrete,
+    display 150ms ease-out allow-discrete;
+  transition-behavior: allow-discrete;
+}
+
+.akapen-web-dialog[open],
+.fp-dialog[open],
+.akapen-license-dialog[open],
+.akapen-plan-popup[open],
+.akapen-license-detail-popup[open],
+.akapen-template-manager[open],
+.akapen-export-settings-dialog[open] {
+  opacity: 1;
+  transition-duration: 250ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.akapen-web-dialog::backdrop,
+.fp-dialog::backdrop,
+.akapen-license-dialog::backdrop,
+.akapen-plan-popup::backdrop,
+.akapen-license-detail-popup::backdrop,
+.akapen-template-manager::backdrop,
+.akapen-export-settings-dialog::backdrop {
+  background: rgba(0, 0, 0, 0) !important;
+  transition:
+    background-color 200ms ease-out,
+    overlay 200ms ease-out allow-discrete,
+    display 200ms ease-out allow-discrete;
+  transition-behavior: allow-discrete;
+}
+
+.akapen-web-dialog[open]::backdrop,
+.fp-dialog[open]::backdrop,
+.akapen-license-dialog[open]::backdrop,
+.akapen-plan-popup[open]::backdrop,
+.akapen-license-detail-popup[open]::backdrop,
+.akapen-template-manager[open]::backdrop,
+.akapen-export-settings-dialog[open]::backdrop {
+  background: rgba(0, 0, 0, 0.5) !important;
+}
+
+@starting-style {
+  .akapen-web-dialog[open],
+  .fp-dialog[open],
+  .akapen-license-dialog[open],
+  .akapen-plan-popup[open],
+  .akapen-license-detail-popup[open],
+  .akapen-template-manager[open],
+  .akapen-export-settings-dialog[open] {
+    opacity: 0;
+  }
+
+  .akapen-web-dialog[open]::backdrop,
+  .fp-dialog[open]::backdrop,
+  .akapen-license-dialog[open]::backdrop,
+  .akapen-plan-popup[open]::backdrop,
+  .akapen-license-detail-popup[open]::backdrop,
+  .akapen-template-manager[open]::backdrop,
+  .akapen-export-settings-dialog[open]::backdrop {
+    background: rgba(0, 0, 0, 0) !important;
+  }
+}
+
+.akapen-export-settings-dialog__body {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.akapen-export-settings-dialog__header,
+.akapen-export-settings-dialog__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.akapen-export-settings-dialog__header h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.akapen-export-settings-dialog__header [data-action='export-settings-close'] {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.akapen-export-settings-dialog__empty {
+  margin: 0;
+  color: var(--ink-subtle);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.akapen-export-settings-dialog__warning {
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--banner-warn-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  font-size: 12px;
+}
+
+.akapen-export-settings-dialog__form {
+  display: grid;
+  gap: 0;
+  max-height: min(520px, calc(100vh - 220px));
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-color: color-mix(in srgb, var(--ink-subtle) 32%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.akapen-export-settings-dialog__form[hidden] {
+  display: none;
+}
+
+.akapen-export-settings-dialog__form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.akapen-export-settings-dialog__form::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ink-subtle) 28%, transparent);
+  border-radius: 999px;
+}
+
+.akapen-export-settings-dialog__section {
+  display: grid;
+  gap: 0;
+}
+
+.akapen-export-settings-dialog__section + .akapen-export-settings-dialog__section {
+  margin-top: 20px;
+}
+
+.akapen-export-settings-dialog__pill-switch {
+  --akapen-export-pill-fill: var(--ink);
+  --akapen-export-pill-active-text: var(--surface);
+  position: relative;
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  padding: 2px;
+  overflow-x: auto;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--rounded-sm) + 2px);
+  isolation: isolate;
+  scrollbar-width: none;
+}
+
+.akapen-export-settings-dialog__pill-switch::-webkit-scrollbar {
+  display: none;
+}
+
+.akapen-export-settings-dialog__header-pill,
+.akapen-export-settings-dialog__pattern-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: var(--rounded-sm);
+  background: var(--akapen-export-pill-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface) 14%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    width 0.28s cubic-bezier(0.34, 1.4, 0.6, 1),
+    opacity 0.12s ease;
+}
+
+.akapen-export-settings-dialog__header-pill.is-ready,
+.akapen-export-settings-dialog__pattern-pill.is-ready {
+  opacity: 1;
+}
+
+.akapen-export-settings-dialog__pill-switch button {
+  position: relative;
+  z-index: 1;
+  min-height: 28px;
+  padding: 3px 13px;
+  color: var(--ink-subtle);
+  background: transparent;
+  border-color: transparent;
+  white-space: nowrap;
+}
+
+.akapen-export-settings-dialog__pill-switch button.is-active {
+  color: var(--akapen-export-pill-active-text);
+  background: transparent;
+  font-weight: 600;
+}
+
+.akapen-export-settings-dialog__field {
+  display: grid;
+  gap: 5px;
+  color: var(--ink-subtle);
+  font-size: 12px;
+}
+
+.akapen-export-settings-dialog__field--unfold {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    max-height 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    margin-top 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.22s ease,
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.akapen-export-settings-dialog__field--unfold.is-unfold {
+  max-height: 220px;
+  margin-top: 8px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.akapen-export-settings-dialog__field select,
+.akapen-export-settings-dialog__field input,
+.akapen-export-settings-dialog__field textarea {
+  width: 100%;
+}
+
+.akapen-export-settings-dialog__field textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.akapen-export-settings-dialog__preview {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 0;
+}
+
+.akapen-export-settings-dialog__preview-file {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.akapen-export-settings-dialog__preview pre {
+  max-height: 180px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--ink);
+  background: var(--akapen-pane-muted-body);
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.akapen-export-settings-dialog__actions {
+  justify-content: space-between;
+}
+
+.akapen-export-settings-dialog__actions-left {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+}
+
+.akapen-export-settings-dialog .akapen-export-settings-dialog__reset {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 0;
+  min-height: 0;
+  color: var(--ink-subtle);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.akapen-export-settings-dialog .akapen-export-settings-dialog__reset:hover:not(:disabled),
+.akapen-export-settings-dialog .akapen-export-settings-dialog__reset:focus-visible,
+.akapen-export-settings-dialog .akapen-export-settings-dialog__reset:active:not(:disabled) {
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.akapen-export-settings-dialog .akapen-export-settings-dialog__reset[hidden] {
+  display: none;
+}
+
+.akapen-export-settings-dialog__done {
+  min-height: 28px;
+  padding: 3px 14px;
+  color: var(--akapen-accent-hover);
+  background: color-mix(in srgb, var(--akapen-red) 16%, transparent);
+  border-color: color-mix(in srgb, var(--akapen-red) 34%, transparent);
+  border-radius: calc(var(--rounded-sm) + 2px);
+  box-shadow: none;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.akapen-export-settings-dialog__done:hover:not(:disabled),
+.akapen-export-settings-dialog__done:focus-visible {
+  color: #fff;
+  background: var(--akapen-red);
+  border-color: var(--akapen-red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--akapen-red) 20%, transparent);
+}
+
+.akapen-export-settings-dialog__done:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.akapen-export-settings-dialog__done:disabled {
+  color: var(--akapen-accent-hover);
+  background: color-mix(in srgb, var(--akapen-red) 16%, transparent);
+  border-color: color-mix(in srgb, var(--akapen-red) 34%, transparent);
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.45;
+  transform: none;
+}
+
+.akapen-export-settings-dialog__done.is-pulsing {
+  animation: akapen-export-settings-save-pulse 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes akapen-export-settings-save-pulse {
+  0% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .akapen-template-manager__controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .akapen-export-settings-dialog__pill-switch {
+    width: 100%;
+  }
+
+  .akapen-template-manager__row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* --- 完了パネル（暗幕＋カード） --- */
@@ -1003,7 +2737,7 @@ span.critic-comment::before {
   padding: 24px 28px;
   background: var(--surface);
   border-radius: var(--rounded-lg);
-  box-shadow: 0 8px 28px rgba(28, 28, 28, 0.18);
+  box-shadow: var(--akapen-shadow-lg);
   font-size: 14px;
   line-height: 1.7;
   animation: akapen-panel-enter 160ms ease-out;
@@ -1012,11 +2746,11 @@ span.critic-comment::before {
 @keyframes akapen-panel-enter {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: scale(0.97);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1);
   }
 }
 
@@ -1050,21 +2784,159 @@ span.critic-comment::before {
   color: var(--ink-subtle);
 }
 
-/* --- ドラッグ中のドロップ枠（D&D の操作状態） --- */
-.akapen-app.is-dragging::after {
-  content: '.md ファイルをここにドロップ';
+/* --- ドラッグ中のドロップ枠（ウェルカム画面のみ） --- */
+.akapen-drop-overlay {
   position: fixed;
-  inset: 8px;
+  inset: 0;
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed var(--ink-subtle);
-  border-radius: var(--rounded-md);
-  background: rgba(251, 251, 250, 0.85);
-  color: var(--ink-subtle);
-  font-size: 15px;
+  background: var(--akapen-overlay-surface);
   pointer-events: none;
+}
+
+.akapen-drop-overlay[hidden] {
+  display: none;
+}
+
+.akapen-drop-overlay__zone {
+  width: min(520px, calc(100vw - 48px));
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, rgba(200, 60, 60, 0.46), rgba(56, 120, 200, 0.28)) border-box;
+  color: var(--ink-subtle);
+  box-shadow: var(--akapen-shadow-lg);
+  padding: 28px;
+  animation: akapen-drop-zone-pulse 1s ease-in-out infinite alternate;
+}
+
+.akapen-drop-overlay__icon {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--rounded-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.akapen-drop-overlay__zone p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+@keyframes akapen-drop-zone-pulse {
+  from {
+    transform: scale(0.992);
+    box-shadow: var(--akapen-shadow-md);
+  }
+  to {
+    transform: scale(1);
+    box-shadow: var(--akapen-shadow-lg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .akapen-empty__brand::after,
+  .akapen-empty__logo-img,
+  .akapen-empty__tagline,
+  .akapen-empty--intro .akapen-empty__prompt,
+  .akapen-empty--intro .akapen-empty__open,
+  .akapen-empty--intro .akapen-empty__resume,
+  .akapen-empty.is-leaving,
+  .akapen-workspace.is-opening .akapen-pane--base,
+  .akapen-workspace.is-opening .akapen-pane--working,
+  .akapen-toolbar.is-enabling button:not(:disabled),
+  .akapen-popover.is-open,
+  .akapen-comment-popup.is-open,
+  .akapen-template-manager [data-primary='true'].is-pulsing,
+  .akapen-export-settings-dialog [data-primary='true'].is-pulsing,
+  .akapen-drop-overlay__zone {
+    animation: none;
+  }
+
+  .akapen-empty__logo-img,
+  .akapen-empty__tagline,
+  .akapen-empty--intro .akapen-empty__prompt,
+  .akapen-empty--intro .akapen-empty__open,
+  .akapen-empty--intro .akapen-empty__resume,
+  .akapen-workspace.is-opening .akapen-pane--base,
+  .akapen-workspace.is-opening .akapen-pane--working,
+  .akapen-template-selector {
+    opacity: 1;
+    transform: none;
+  }
+
+  .akapen-empty__logo-img {
+    -webkit-mask-position: 0% 0;
+    mask-position: 0% 0;
+  }
+
+  .akapen-empty__brand::after {
+    opacity: 0;
+  }
+
+  body,
+  .akapen-app,
+  .akapen-toolbar,
+  .akapen-tabbar,
+  .akapen-tabbar__indicator,
+  .akapen-workspace,
+  .akapen-pane,
+  .akapen-pane-title,
+  .akapen-pane-body,
+  .akapen-divider,
+  .akapen-empty,
+  .akapen-banner,
+  .akapen-theme-row,
+  .akapen-language-row,
+  .akapen-theme-pill,
+  .akapen-language-pill,
+  .akapen-view-switch,
+  .akapen-view-switch__pill,
+  .akapen-statusbar,
+  .akapen-toolbar__undoredo [data-action='undo'],
+  .akapen-toolbar__undoredo [data-action='redo'],
+  .akapen-shortcuts-panel,
+  .akapen-shortcuts-panel__card,
+  .akapen-web-dialog,
+  .fp-dialog,
+  .akapen-license-dialog,
+  .akapen-plan-popup,
+  .akapen-license-detail-popup,
+  .akapen-template-manager,
+  .akapen-template-manager__done,
+  .akapen-template-manager__tab-pill,
+  .akapen-template-manager__language-pill,
+  .akapen-export-settings-dialog__done,
+  .akapen-export-settings-dialog__header-pill,
+  .akapen-export-settings-dialog__pattern-pill,
+  .akapen-export-settings-dialog__field--unfold,
+  .akapen-template-selector,
+  .akapen-template-selector__item,
+  .akapen-export-settings-dialog {
+    transition: none;
+  }
+
+  .akapen-toolbar__undoredo [data-action='undo'],
+  .akapen-toolbar__undoredo [data-action='redo'] {
+    transform: none !important;
+  }
 }
 
 /* ===== G6: 保存グループ（「保存」ボタン + 「▼」ドロップダウン） ===== */
@@ -1085,7 +2957,7 @@ span.critic-comment::before {
   min-width: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-  border-left: 1px solid rgba(0,0,0,0.15);
+  border-left: 1px solid var(--line);
   font-size: 11px;
 }
 
@@ -1097,7 +2969,7 @@ span.critic-comment::before {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--rounded-sm);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  box-shadow: var(--akapen-shadow-sm);
   list-style: none;
   padding: 4px 0;
   margin: 0;
@@ -1136,7 +3008,7 @@ span.critic-comment::before {
   height: 100%;
   background: var(--surface);
   border-left: 1px solid var(--line);
-  box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+  box-shadow: var(--akapen-shadow-md);
   display: flex;
   flex-direction: column;
   transition: right 0.22s ease;
@@ -1239,8 +3111,8 @@ span.critic-comment::before {
     45deg,
     transparent,
     transparent 4px,
-    rgba(0,0,0,0.03) 4px,
-    rgba(0,0,0,0.03) 8px
+    color-mix(in srgb, var(--ink) 5%, transparent) 4px,
+    color-mix(in srgb, var(--ink) 5%, transparent) 8px
   );
 }
 
@@ -1295,4 +3167,283 @@ span.critic-comment::before {
   border-top: 1px solid var(--line);
   pointer-events: none; /* クリックをエディターに透過 */
   z-index: 100;
+}
+
+:root[data-theme='dark'] .akapen-web-dialog,
+:root[data-theme='dark'] .fp-dialog,
+:root[data-theme='dark'] .akapen-license-dialog,
+:root[data-theme='dark'] .akapen-plan-popup,
+:root[data-theme='dark'] .akapen-license-detail-popup,
+:root[data-theme='dark'] .akapen-template-manager,
+:root[data-theme='dark'] .akapen-export-settings-dialog {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: var(--akapen-shadow-lg);
+}
+
+:root[data-theme='dark'] .akapen-web-dialog::backdrop,
+:root[data-theme='dark'] .fp-dialog::backdrop,
+:root[data-theme='dark'] .akapen-license-dialog::backdrop,
+:root[data-theme='dark'] .akapen-plan-popup::backdrop,
+:root[data-theme='dark'] .akapen-license-detail-popup::backdrop,
+:root[data-theme='dark'] .akapen-template-manager::backdrop,
+:root[data-theme='dark'] .akapen-export-settings-dialog::backdrop {
+  background: rgba(0, 0, 0, 0) !important;
+}
+
+:root[data-theme='dark'] .akapen-web-dialog[open]::backdrop,
+:root[data-theme='dark'] .fp-dialog[open]::backdrop,
+:root[data-theme='dark'] .akapen-license-dialog[open]::backdrop,
+:root[data-theme='dark'] .akapen-plan-popup[open]::backdrop,
+:root[data-theme='dark'] .akapen-license-detail-popup[open]::backdrop,
+:root[data-theme='dark'] .akapen-template-manager[open]::backdrop,
+:root[data-theme='dark'] .akapen-export-settings-dialog[open]::backdrop {
+  background: rgba(0, 0, 0, 0.5) !important;
+}
+
+:root[data-theme='dark'] .akapen-web-dialog-detail,
+:root[data-theme='dark'] .ld-status-meta,
+:root[data-theme='dark'] .ld-form label,
+:root[data-theme='dark'] .ld-message,
+:root[data-theme='dark'] .akapen-license-settings-status,
+:root[data-theme='dark'] .pp-table th:first-child,
+:root[data-theme='dark'] .pp-note,
+:root[data-theme='dark'] .pp-comment,
+:root[data-theme='dark'] .akapen-template-settings-description,
+:root[data-theme='dark'] .akapen-export-settings-description,
+:root[data-theme='dark'] .akapen-template-manager__row label,
+:root[data-theme='dark'] .akapen-template-manager__reference,
+:root[data-theme='dark'] .akapen-template-manager__badge,
+:root[data-theme='dark'] .akapen-export-settings-dialog__field,
+:root[data-theme='dark'] .fp-empty,
+:root[data-theme='dark'] .fp-footer-label {
+  color: var(--ink-subtle);
+}
+
+:root[data-theme='dark'] .akapen-web-dialog button,
+:root[data-theme='dark'] .ld-close,
+:root[data-theme='dark'] .ld-btn,
+:root[data-theme='dark'] .pp-buy,
+:root[data-theme='dark'] .akapen-template-settings-row button,
+:root[data-theme='dark'] .akapen-export-settings-row button,
+:root[data-theme='dark'] .akapen-template-manager button,
+:root[data-theme='dark'] .akapen-export-settings-dialog button,
+:root[data-theme='dark'] .fp-nav-btn,
+:root[data-theme='dark'] .fp-btn {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .akapen-web-dialog button:hover,
+:root[data-theme='dark'] .ld-close:hover,
+:root[data-theme='dark'] .ld-btn:hover,
+:root[data-theme='dark'] .pp-buy:hover,
+:root[data-theme='dark'] .akapen-template-settings-row button:hover,
+:root[data-theme='dark'] .akapen-export-settings-row button:hover,
+:root[data-theme='dark'] .akapen-template-manager button:hover,
+:root[data-theme='dark'] .akapen-export-settings-dialog button:hover,
+:root[data-theme='dark'] .fp-nav-btn:hover,
+:root[data-theme='dark'] .fp-btn:hover {
+  background: var(--surface-hover);
+}
+
+:root[data-theme='dark'] .akapen-template-manager__tabs button,
+:root[data-theme='dark'] .akapen-template-manager__language-switch button,
+:root[data-theme='dark'] .akapen-template-manager [data-action='template-add'],
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__reset-all,
+:root[data-theme='dark'] .akapen-template-manager__delete {
+  background: transparent;
+  border-color: transparent;
+}
+
+:root[data-theme='dark'] .akapen-export-settings-dialog__pill-switch button,
+:root[data-theme='dark'] .akapen-export-settings-dialog .akapen-export-settings-dialog__reset {
+  background: transparent;
+  border-color: transparent;
+}
+
+:root[data-theme='dark'] .akapen-export-settings-dialog__header-pill,
+:root[data-theme='dark'] .akapen-export-settings-dialog__pattern-pill {
+  background: var(--ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bg) 28%, transparent);
+}
+
+:root[data-theme='dark'] .akapen-export-settings-dialog__pill-switch button:not(.is-active) {
+  color: var(--ink-subtle);
+}
+
+:root[data-theme='dark'] .akapen-template-manager__tabs button:hover,
+:root[data-theme='dark'] .akapen-template-manager__language-switch button:hover,
+:root[data-theme='dark'] .akapen-template-manager [data-action='template-add']:hover,
+:root[data-theme='dark'] .akapen-template-manager__reset-all:hover,
+:root[data-theme='dark'] .akapen-template-manager__delete:hover {
+  background: var(--surface-hover);
+}
+
+:root[data-theme='dark'] .akapen-template-manager [data-action='template-add']:hover,
+:root[data-theme='dark'] .akapen-template-manager__reset-all:hover {
+  background: transparent;
+}
+
+:root[data-theme='dark'] .akapen-export-settings-dialog__pill-switch button:hover,
+:root[data-theme='dark'] .akapen-export-settings-dialog__pill-switch button:active,
+:root[data-theme='dark'] .akapen-export-settings-dialog__pill-switch button.is-active,
+:root[data-theme='dark'] .akapen-export-settings-dialog .akapen-export-settings-dialog__reset:hover {
+  background: transparent;
+}
+
+:root[data-theme='dark'] .akapen-template-manager [data-action='template-add']:hover:not(:disabled),
+:root[data-theme='dark'] .akapen-template-manager [data-action='template-add']:focus-visible,
+:root[data-theme='dark'] .akapen-template-manager [data-action='template-add']:active:not(:disabled),
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__reset-all:hover:not(:disabled),
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__reset-all:focus-visible,
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__reset-all:active:not(:disabled) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+:root[data-theme='dark'] .akapen-export-settings-dialog .akapen-export-settings-dialog__reset:hover:not(:disabled),
+:root[data-theme='dark'] .akapen-export-settings-dialog .akapen-export-settings-dialog__reset:focus-visible,
+:root[data-theme='dark'] .akapen-export-settings-dialog .akapen-export-settings-dialog__reset:active:not(:disabled) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+:root[data-theme='dark'] .akapen-web-dialog button[data-primary='true'],
+:root[data-theme='dark'] .ld-btn-primary,
+:root[data-theme='dark'] .akapen-license-settings-row button,
+:root[data-theme='dark'] .akapen-template-manager button[data-primary='true'],
+:root[data-theme='dark'] .akapen-export-settings-dialog button[data-primary='true'],
+:root[data-theme='dark'] .pp-buy-primary {
+  color: #fff;
+  background: var(--akapen-red);
+  border-color: var(--akapen-red);
+}
+
+:root[data-theme='dark'] .akapen-template-manager__tabs button[aria-selected='true'],
+:root[data-theme='dark'] .akapen-template-manager__language-switch button.is-active,
+:root[data-theme='dark'] .akapen-export-settings-dialog__pill-switch button.is-active {
+  color: var(--surface);
+  background: transparent;
+  border-color: transparent;
+}
+
+:root[data-theme='dark'] .ld-link {
+  color: #d86660;
+}
+
+:root[data-theme='dark'] .ld-status,
+:root[data-theme='dark'] .akapen-template-manager__badge,
+:root[data-theme='dark'] .akapen-export-settings-dialog__preview pre,
+:root[data-theme='dark'] .fp-titlebar,
+:root[data-theme='dark'] .fp-navbar,
+:root[data-theme='dark'] .fp-footer {
+  background: var(--akapen-pane-muted);
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .ld-form input,
+:root[data-theme='dark'] .akapen-template-manager select,
+:root[data-theme='dark'] .akapen-template-manager textarea,
+:root[data-theme='dark'] .akapen-export-settings-dialog select,
+:root[data-theme='dark'] .akapen-export-settings-dialog input,
+:root[data-theme='dark'] .akapen-export-settings-dialog textarea,
+:root[data-theme='dark'] .fp-breadcrumb,
+:root[data-theme='dark'] .fp-footer-filename {
+  color: var(--ink);
+  background: var(--akapen-pane-muted-body);
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .akapen-template-manager__list {
+  background: var(--akapen-pane-muted-body);
+}
+
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__row textarea {
+  background: var(--surface);
+}
+
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__done {
+  color: var(--akapen-accent-hover);
+  background: color-mix(in srgb, var(--akapen-red) 22%, transparent);
+  border-color: color-mix(in srgb, var(--akapen-red) 46%, transparent);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__done:hover:not(:disabled),
+:root[data-theme='dark'] .akapen-template-manager .akapen-template-manager__done:focus-visible {
+  color: #fff;
+  background: var(--akapen-accent-hover);
+  border-color: var(--akapen-accent-hover);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--akapen-red) 24%, transparent);
+}
+
+:root[data-theme='dark'] .akapen-export-settings-dialog button.akapen-export-settings-dialog__done[data-primary='true'] {
+  color: var(--akapen-accent-hover);
+  background: color-mix(in srgb, var(--akapen-red) 22%, transparent);
+  border-color: color-mix(in srgb, var(--akapen-red) 46%, transparent);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .akapen-export-settings-dialog .akapen-export-settings-dialog__done:hover:not(:disabled),
+:root[data-theme='dark'] .akapen-export-settings-dialog .akapen-export-settings-dialog__done:focus-visible {
+  color: #fff;
+  background: var(--akapen-accent-hover);
+  border-color: var(--akapen-accent-hover);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--akapen-red) 24%, transparent);
+}
+
+:root[data-theme='dark'] .ld-form input:focus,
+:root[data-theme='dark'] .fp-footer input.fp-footer-filename:focus {
+  border-color: var(--akapen-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--akapen-accent) 24%, transparent);
+}
+
+:root[data-theme='dark'] .pp-table th,
+:root[data-theme='dark'] .pp-table td:first-child,
+:root[data-theme='dark'] .ld-detail-body li,
+:root[data-theme='dark'] .fp-bc-current,
+:root[data-theme='dark'] .fp-tree-node,
+:root[data-theme='dark'] .fp-row {
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .pp-table td,
+:root[data-theme='dark'] .pp-footer,
+:root[data-theme='dark'] .ld-detail-footer,
+:root[data-theme='dark'] .fp-body,
+:root[data-theme='dark'] .fp-tree {
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .fp-tree,
+:root[data-theme='dark'] .fp-list {
+  background: var(--akapen-pane-muted-body);
+}
+
+:root[data-theme='dark'] .fp-breadcrumb button,
+:root[data-theme='dark'] .fp-row[data-type='dir'] .fp-row-icon {
+  color: var(--akapen-accent);
+}
+
+:root[data-theme='dark'] .fp-tree-node:hover,
+:root[data-theme='dark'] .fp-row:hover {
+  background: var(--surface-hover);
+}
+
+:root[data-theme='dark'] .fp-tree-node.selected,
+:root[data-theme='dark'] .fp-row.selected,
+:root[data-theme='dark'] .fp-btn-primary {
+  color: #fff;
+  background: var(--akapen-accent);
+}
+
+:root[data-theme='dark'] .fp-btn-primary:hover {
+  background: var(--akapen-accent-hover);
 }

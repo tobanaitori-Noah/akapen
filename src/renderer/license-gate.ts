@@ -1,4 +1,5 @@
 import type { LicenseApiResult } from './bridge-web';
+import { onLanguageChange, t, type TranslationKey } from './i18n';
 
 const CHECKOUT_URL_STANDARD = 'https://buy.polar.sh/polar_cl_elVIqlJG60KiZ6ApP4b5hd7JYVjyHPfGs5MFE14ytSU';
 const CHECKOUT_URL_SUPPORTER = 'https://buy.polar.sh/polar_cl_VpJIdymnwMcXL6BCFPAXWZVDuveWPKvRjQDdH0LBigX';
@@ -9,10 +10,23 @@ type LicenseClient = {
   deactivate(): Promise<LicenseApiResult>;
 };
 
+export type PremiumFeature = 'tabs' | 'comment-templates' | 'export-settings';
+
+export function normalizePremiumFeature(value: unknown): PremiumFeature {
+  return value === 'comment-templates' || value === 'export-settings' ? value : 'tabs';
+}
+
+export function premiumFeatureDetailKey(feature: PremiumFeature): TranslationKey {
+  if (feature === 'comment-templates') return 'premium.featureGateDetail.commentTemplates';
+  if (feature === 'export-settings') return 'premium.featureGateDetail.exportSettings';
+  return 'premium.featureGateDetail.tabs';
+}
+
 export interface LicenseGateHandle {
   element: HTMLDialogElement;
   attachToSettingsPanel(): void;
   open(): void;
+  openPlanComparison(): void;
   refresh(): Promise<void>;
 }
 
@@ -141,6 +155,8 @@ const STYLE = `
 export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
   let latest: LicenseApiResult | null = null;
   let settingsStatusEl: HTMLElement | null = null;
+  let settingsTitleEl: HTMLElement | null = null;
+  let settingsButtonEl: HTMLButtonElement | null = null;
 
   // --- スタイル注入 ---
   const styleEl = document.createElement('style');
@@ -153,23 +169,23 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
   dialog.innerHTML = `
     <div class="ld-body">
       <div class="ld-header">
-        <h2>ライセンス</h2>
-        <button type="button" class="ld-close" data-action="close" aria-label="閉じる">×</button>
+        <h2 data-role="license-title">${t('license.title')}</h2>
+        <button type="button" class="ld-close" data-action="close" aria-label="${t('license.close')}">×</button>
       </div>
       <div class="ld-status">
         <div class="ld-status-label" data-role="status-label">Free</div>
         <div class="ld-status-meta" data-role="status-meta"></div>
       </div>
       <div class="ld-form">
-        <label for="akapen-license-key">ライセンスキー</label>
+        <label for="akapen-license-key" data-role="license-key-label">${t('license.key')}</label>
         <input id="akapen-license-key" type="text" autocomplete="off" spellcheck="false" placeholder="AKAPEN-XXXX-XXXX-XXXX" data-role="license-key">
       </div>
       <div class="ld-actions">
-        <button type="button" class="ld-btn-primary" data-action="activate">認証する</button>
-        <button type="button" class="ld-btn" data-action="deactivate">解除</button>
+        <button type="button" class="ld-btn-primary" data-action="activate">${t('license.activate')}</button>
+        <button type="button" class="ld-btn" data-action="deactivate">${t('license.deactivate')}</button>
       </div>
       <div>
-        <button type="button" class="ld-link" data-action="compare">プランを比較</button>
+        <button type="button" class="ld-link" data-action="compare">${t('license.compare')}</button>
       </div>
       <div class="ld-message" data-role="message"></div>
     </div>
@@ -211,17 +227,17 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
 
   q<HTMLButtonElement>('[data-action="activate"]').addEventListener('click', () => {
     const key = keyEl.value.trim();
-    if (!key) { setMessage('ライセンスキーを入力してください。'); return; }
+    if (!key) { setMessage(t('license.enterKey')); return; }
     void client.activate(key).then((result) => {
       applyResult(result);
-      if (result.status === 'ok') { keyEl.value = ''; setMessage('ライセンスを認証しました。'); }
+      if (result.status === 'ok') { keyEl.value = ''; setMessage(t('license.activated')); }
     });
   });
 
   q<HTMLButtonElement>('[data-action="deactivate"]').addEventListener('click', () => {
     void client.deactivate().then((result) => {
       applyResult(result);
-      if (result.status === 'ok') setMessage('ライセンスを解除しました。');
+      if (result.status === 'ok') setMessage(t('license.deactivated'));
     });
   });
 
@@ -231,8 +247,8 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
   planPopup.innerHTML = `
     <div class="pp-body">
       <div class="pp-header">
-        <h3>プラン比較</h3>
-        <button type="button" class="ld-close" data-action="pp-close" aria-label="閉じる">×</button>
+        <h3 data-role="plan-title">${t('license.planComparison')}</h3>
+        <button type="button" class="ld-close" data-action="pp-close" aria-label="${t('license.close')}">×</button>
       </div>
       <table class="pp-table">
         <thead>
@@ -240,44 +256,97 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
         </thead>
         <tbody>
           <tr>
-            <td>基本機能</td>
+            <td data-role="plan-basic">${t('license.basicFeatures')}</td>
             <td class="pp-check">✓</td>
             <td class="pp-check">✓</td>
             <td class="pp-check">✓</td>
           </tr>
           <tr>
-            <td>利用範囲</td>
-            <td>個人・趣味</td>
-            <td>商用OK</td>
-            <td>商用OK</td>
+            <td data-role="plan-usage">${t('license.usage')}</td>
+            <td data-role="plan-personal">${t('license.personalHobby')}</td>
+            <td data-role="plan-standard-commercial">${t('license.commercialOk')}</td>
+            <td data-role="plan-supporter-commercial">${t('license.commercialOk')}</td>
           </tr>
           <tr>
-            <td>今後の機能更新・追加機能</td>
+            <td data-role="plan-updates">${t('license.futureUpdates')}</td>
             <td class="pp-dash">—</td>
             <td class="pp-check">✓</td>
             <td class="pp-check">✓</td>
           </tr>
           <tr>
-            <td>同時利用デバイス数</td>
+            <td data-role="plan-devices">${t('license.deviceCount')}</td>
             <td class="pp-dash">—</td>
-            <td>2台</td>
-            <td>4台</td>
+            <td data-role="plan-two-devices">${t('license.twoDevices')}</td>
+            <td data-role="plan-four-devices">${t('license.fourDevices')}</td>
           </tr>
           <tr>
             <td class="pp-btn-cell"></td>
             <td class="pp-btn-cell"></td>
-            <td class="pp-btn-cell"><button type="button" class="pp-buy-primary" data-action="buy-standard">購入する</button></td>
-            <td class="pp-btn-cell"><button type="button" class="pp-buy-primary" data-action="buy-supporter">購入する</button></td>
+            <td class="pp-btn-cell"><button type="button" class="pp-buy-primary" data-action="buy-standard">${t('license.buy')}</button></td>
+            <td class="pp-btn-cell"><button type="button" class="pp-buy-primary" data-action="buy-supporter">${t('license.buy')}</button></td>
           </tr>
         </tbody>
       </table>
-      <p class="pp-comment">Standard と Supporter の機能的な内容は同じです。<br>同時利用デバイス数のみ異なります。<br><br>Supporter プランで、開発者をぜひ応援していただけると嬉しいです。</p>
+      <p class="pp-comment" data-role="plan-note">${t('license.planNote')}</p>
     </div>
     <div class="pp-footer">
-      <button type="button" class="ld-link" data-action="show-license-detail">ⓘ ライセンス詳細</button>
+      <button type="button" class="ld-link" data-action="show-license-detail">${t('license.detailsLink')}</button>
     </div>
   `;
   document.body.appendChild(planPopup);
+  const openPlanComparison = () => {
+    if (!planPopup.open) planPopup.showModal();
+  };
+
+  // --- プレミアム機能ゲートダイアログ（プラン比較の前に表示） ---
+  const gateDialog = document.createElement('dialog');
+  gateDialog.className = 'akapen-license-detail-popup';
+  gateDialog.innerHTML = `
+    <div class="ld-detail-body">
+      <div class="pp-header">
+        <h3 data-role="gate-title"></h3>
+        <button type="button" class="ld-close" data-action="gate-close" aria-label="${t('premium.featureGateCancel')}">×</button>
+      </div>
+      <p style="font-size:14px;line-height:1.6;color:var(--ink,#1A1A1C);margin:0 0 16px;" data-role="gate-detail"></p>
+      <div class="ld-actions">
+        <button type="button" class="ld-btn-primary" data-action="gate-view-plans"></button>
+        <button type="button" class="ld-btn" data-action="gate-cancel"></button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(gateDialog);
+
+  const gateTitle = gateDialog.querySelector<HTMLElement>('[data-role="gate-title"]')!;
+  const gateDetail = gateDialog.querySelector<HTMLElement>('[data-role="gate-detail"]')!;
+  const gateViewPlans = gateDialog.querySelector<HTMLButtonElement>('[data-action="gate-view-plans"]')!;
+  const gateCancel = gateDialog.querySelector<HTMLButtonElement>('[data-action="gate-cancel"]')!;
+  const gateClose = gateDialog.querySelector<HTMLButtonElement>('[data-action="gate-close"]')!;
+  let gateFeature: PremiumFeature = 'tabs';
+
+  const updateGateText = (feature: PremiumFeature = gateFeature) => {
+    gateFeature = feature;
+    gateTitle.textContent = t('premium.featureGateTitle');
+    gateDetail.textContent = t(premiumFeatureDetailKey(gateFeature));
+    gateViewPlans.textContent = t('premium.featureGateViewPlans');
+    gateCancel.textContent = t('premium.featureGateCancel');
+    gateClose.ariaLabel = t('premium.featureGateCancel');
+  };
+  updateGateText();
+
+  gateViewPlans.addEventListener('click', () => {
+    gateDialog.close();
+    openPlanComparison();
+  });
+  gateCancel.addEventListener('click', () => gateDialog.close());
+  gateClose.addEventListener('click', () => gateDialog.close());
+  gateDialog.addEventListener('cancel', () => gateDialog.close());
+
+  window.addEventListener('akapen:premium-required', (event) => {
+    const feature =
+      event instanceof CustomEvent ? normalizePremiumFeature(event.detail?.feature) : 'tabs';
+    updateGateText(feature);
+    if (!gateDialog.open) gateDialog.showModal();
+  });
 
   planPopup.querySelector('[data-action="pp-close"]')!.addEventListener('click', () => planPopup.close());
   planPopup.querySelector('[data-action="buy-standard"]')!.addEventListener('click', () => {
@@ -288,7 +357,7 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
   });
   planPopup.addEventListener('cancel', () => planPopup.close());
 
-  q<HTMLButtonElement>('[data-action="compare"]').addEventListener('click', () => planPopup.showModal());
+  q<HTMLButtonElement>('[data-action="compare"]').addEventListener('click', openPlanComparison);
 
   // --- ライセンス詳細ポップアップ ---
   const detailPopup = document.createElement('dialog');
@@ -296,14 +365,14 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
   detailPopup.innerHTML = `
     <div class="ld-detail-body">
       <div class="pp-header">
-        <h3>ライセンス詳細</h3>
-        <button type="button" class="ld-close" data-action="detail-close" aria-label="閉じる">×</button>
+        <h3 data-role="detail-title">${t('license.details')}</h3>
+        <button type="button" class="ld-close" data-action="detail-close" aria-label="${t('license.close')}">×</button>
       </div>
-      <ul>
-        <li><strong>個人の趣味・非営利での利用</strong><br>Free プランで OK です。無料でご利用いただけます。</li>
-        <li><strong>仕事や商用での利用</strong><br>収益につながる用途では、Standard プラン以上のライセンス購入をお願いします。</li>
-        <li><strong>1人1ライセンス</strong><br>他の人への譲渡や共有は NG です。</li>
-        <li><strong>再配布禁止</strong><br>AkaPen のコピーを他の人に配布したり、別のサービスに組み込んで提供することは NG です。</li>
+      <ul data-role="detail-list">
+        <li><strong>${t('license.personalUseTitle')}</strong><br>${t('license.personalUseBody')}</li>
+        <li><strong>${t('license.commercialUseTitle')}</strong><br>${t('license.commercialUseBody')}</li>
+        <li><strong>${t('license.onePersonTitle')}</strong><br>${t('license.onePersonBody')}</li>
+        <li><strong>${t('license.noRedistributionTitle')}</strong><br>${t('license.noRedistributionBody')}</li>
       </ul>
     </div>
   `;
@@ -316,6 +385,53 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
     detailPopup.showModal();
   });
 
+  const pq = <T extends HTMLElement>(sel: string): T => {
+    const el = planPopup.querySelector<T>(sel);
+    if (!el) throw new Error(`license-plan: ${sel} not found`);
+    return el;
+  };
+  const dq = <T extends HTMLElement>(sel: string): T => {
+    const el = detailPopup.querySelector<T>(sel);
+    if (!el) throw new Error(`license-detail: ${sel} not found`);
+    return el;
+  };
+  const renderStaticText = () => {
+    q<HTMLHeadingElement>('[data-role="license-title"]').textContent = t('license.title');
+    q<HTMLButtonElement>('[data-action="close"]').setAttribute('aria-label', t('license.close'));
+    q<HTMLLabelElement>('[data-role="license-key-label"]').textContent = t('license.key');
+    q<HTMLButtonElement>('[data-action="activate"]').textContent = t('license.activate');
+    q<HTMLButtonElement>('[data-action="deactivate"]').textContent = t('license.deactivate');
+    q<HTMLButtonElement>('[data-action="compare"]').textContent = t('license.compare');
+    pq<HTMLHeadingElement>('[data-role="plan-title"]').textContent = t('license.planComparison');
+    pq<HTMLButtonElement>('[data-action="pp-close"]').setAttribute('aria-label', t('license.close'));
+    pq<HTMLTableCellElement>('[data-role="plan-basic"]').textContent = t('license.basicFeatures');
+    pq<HTMLTableCellElement>('[data-role="plan-usage"]').textContent = t('license.usage');
+    pq<HTMLTableCellElement>('[data-role="plan-personal"]').textContent = t('license.personalHobby');
+    pq<HTMLTableCellElement>('[data-role="plan-standard-commercial"]').textContent = t('license.commercialOk');
+    pq<HTMLTableCellElement>('[data-role="plan-supporter-commercial"]').textContent = t('license.commercialOk');
+    pq<HTMLTableCellElement>('[data-role="plan-updates"]').textContent = t('license.futureUpdates');
+    pq<HTMLTableCellElement>('[data-role="plan-devices"]').textContent = t('license.deviceCount');
+    pq<HTMLTableCellElement>('[data-role="plan-two-devices"]').textContent = t('license.twoDevices');
+    pq<HTMLTableCellElement>('[data-role="plan-four-devices"]').textContent = t('license.fourDevices');
+    pq<HTMLButtonElement>('[data-action="buy-standard"]').textContent = t('license.buy');
+    pq<HTMLButtonElement>('[data-action="buy-supporter"]').textContent = t('license.buy');
+    pq<HTMLParagraphElement>('[data-role="plan-note"]').innerHTML = t('license.planNote');
+    pq<HTMLButtonElement>('[data-action="show-license-detail"]').textContent = t('license.detailsLink');
+    dq<HTMLHeadingElement>('[data-role="detail-title"]').textContent = t('license.details');
+    dq<HTMLButtonElement>('[data-action="detail-close"]').setAttribute('aria-label', t('license.close'));
+    dq<HTMLUListElement>('[data-role="detail-list"]').innerHTML = [
+      `<li><strong>${t('license.personalUseTitle')}</strong><br>${t('license.personalUseBody')}</li>`,
+      `<li><strong>${t('license.commercialUseTitle')}</strong><br>${t('license.commercialUseBody')}</li>`,
+      `<li><strong>${t('license.onePersonTitle')}</strong><br>${t('license.onePersonBody')}</li>`,
+      `<li><strong>${t('license.noRedistributionTitle')}</strong><br>${t('license.noRedistributionBody')}</li>`,
+    ].join('');
+    updateGateText();
+    if (settingsTitleEl) settingsTitleEl.textContent = t('license.title');
+    if (settingsButtonEl) settingsButtonEl.textContent = t('license.manage');
+    render();
+  };
+  onLanguageChange(renderStaticText);
+
   return {
     element: dialog,
     attachToSettingsPanel() {
@@ -327,7 +443,9 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
       sep.dataset.role = 'akapen-license-settings';
       const title = document.createElement('div');
       title.className = 'akapen-shortcuts-panel__section-title';
-      title.textContent = 'ライセンス';
+      title.dataset.role = 'akapen-license-settings';
+      title.textContent = t('license.title');
+      settingsTitleEl = title;
       const row = document.createElement('div');
       row.className = 'akapen-license-settings-row';
       row.dataset.role = 'akapen-license-settings';
@@ -336,39 +454,48 @@ export function createLicenseGate(client: LicenseClient): LicenseGateHandle {
       settingsStatusEl.textContent = latest ? labelFor(latest) : 'Free';
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = '管理';
+      button.textContent = t('license.manage');
+      settingsButtonEl = button;
       button.addEventListener('click', () => {
         if (!dialog.open) dialog.showModal();
         void refresh();
       });
       row.append(settingsStatusEl, button);
-      card.appendChild(sep);
-      card.appendChild(title);
-      card.appendChild(row);
+      const languageSection = card.querySelector<HTMLElement>('[data-role="language-settings"]');
+      if (languageSection) {
+        card.insertBefore(sep, languageSection);
+        card.insertBefore(title, languageSection);
+        card.insertBefore(row, languageSection);
+      } else {
+        card.appendChild(sep);
+        card.appendChild(title);
+        card.appendChild(row);
+      }
     },
     open() {
       if (!dialog.open) dialog.showModal();
       void refresh();
       keyEl.focus();
     },
+    openPlanComparison,
     refresh,
   };
 }
 
 function labelFor(result: LicenseApiResult): string {
-  if (result.status === 'error') return '未認証';
+  if (result.status === 'error') return t('license.unlicensed');
   if (result.license.licensed && result.license.plan === 'supporter') return 'Supporter';
   if (result.license.licensed && result.license.plan === 'standard') return 'Standard';
   if (result.license.plan === 'free') return 'Free';
-  return '未認証';
+  return t('license.unlicensed');
 }
 
 function metaFor(result: LicenseApiResult | null): string {
   if (!result) return '';
   if (result.status === 'error') return result.message;
   const { activationId, lastValidated } = result.license;
-  if (!activationId) return 'v1.0 の機能は Free で利用できます。';
-  const validated = lastValidated ? `最終確認: ${fmtDate(lastValidated)}` : '未確認';
+  if (!activationId) return t('license.freeMeta');
+  const validated = lastValidated ? t('license.lastChecked', { date: fmtDate(lastValidated) }) : t('license.notChecked');
   return validated;
 }
 

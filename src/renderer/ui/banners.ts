@@ -8,6 +8,7 @@
  * - autosave-failed（赤）: 自動保存の write 失敗。成功で自動的に消える（hide あり）。
  * - warning（黄）: 単発の警告（autosave の read/list/remove 失敗・復元の表記差）。
  */
+import { onLanguageChange, t } from '../i18n';
 
 export interface BannersHandle {
   element: HTMLElement;
@@ -52,10 +53,10 @@ function createRepairModal(): {
   element.setAttribute('aria-labelledby', 'akapen-repair-modal-title');
   element.innerHTML = `
     <div class="akapen-repair-modal__panel">
-      <h2 id="akapen-repair-modal-title">修復内容</h2>
+      <h2 id="akapen-repair-modal-title">${t('banners.repairTitle')}</h2>
       <ul data-role="repair-detail-list"></ul>
       <div class="akapen-repair-modal__actions">
-        <button type="button" data-action="repair-detail-close">閉じる</button>
+        <button type="button" data-action="repair-detail-close">${t('banners.close')}</button>
       </div>
     </div>
   `;
@@ -66,6 +67,10 @@ function createRepairModal(): {
     element.classList.add('is-hidden');
   };
   close.addEventListener('click', hide);
+  onLanguageChange(() => {
+    element.querySelector<HTMLHeadingElement>('#akapen-repair-modal-title')!.textContent = t('banners.repairTitle');
+    close.textContent = t('banners.close');
+  });
   element.addEventListener('click', (event) => {
     if (event.target === element) hide();
   });
@@ -93,18 +98,22 @@ function createBanner(modifier: string, modal?: ReturnType<typeof createRepairMo
   const details = document.createElement('button');
   details.type = 'button';
   details.dataset.action = `banner-details-${modifier}`;
-  details.textContent = '詳細はコチラ';
+  details.textContent = t('banners.details');
   details.hidden = true;
   const close = document.createElement('button');
   close.type = 'button';
   close.dataset.action = `banner-close-${modifier}`;
-  close.textContent = '閉じる';
+  close.textContent = t('banners.close');
   let currentDetails: readonly string[] = [];
   details.addEventListener('click', () => {
     if (modal && currentDetails.length > 0) modal.show(currentDetails);
   });
   close.addEventListener('click', () => {
     el.classList.add('is-hidden'); // 表示だけ閉じる（state には残す）
+  });
+  onLanguageChange(() => {
+    details.textContent = t('banners.details');
+    close.textContent = t('banners.close');
   });
   el.append(text, details, close);
   return {
@@ -136,20 +145,13 @@ export function createBanners(): BannersHandle {
   return {
     element,
     showCriticConflict(count) {
-      conflict.show(
-        `元原稿に CriticMarkup 風の文字列が ${count} 箇所あります。` +
-          'コード例などは添削マークとして表示されることがあります' +
-          '（書き出しの整合性検査が最終確認します）',
-      );
+      conflict.show(t('banners.conflict', { count }));
     },
     showBaseChanged() {
-      baseChanged.show(
-        '元データのファイルがレビュー中に外部で変更されました。' +
-          'この画面は開いた時点の内容のままです。完了前に開き直すか、相手に確認してください',
-      );
+      baseChanged.show(t('banners.baseChanged'));
     },
     showAutosaveFailed(message) {
-      autosaveFailed.show(`自動保存に失敗しています: ${message}（添削はこのまま続けられます）`);
+      autosaveFailed.show(t('banners.autosaveFailed', { message }));
     },
     hideAutosaveFailed() {
       autosaveFailed.hide();

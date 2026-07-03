@@ -1,7 +1,10 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import open from 'open';
+import { installSkill } from './server/lib/install-skill.js';
 import { activateLicense } from './server/lib/license.js';
 import { startServer } from './server/server.js';
 
@@ -10,13 +13,31 @@ function parseArgs(argv: string[]): {
   filePath?: string;
   shouldOpen: boolean;
   licenseKey?: string;
+  shouldInstallSkill: boolean;
+  force: boolean;
+  showVersion: boolean;
 } {
   let port = 51212;
   let shouldOpen = true;
   let filePath: string | undefined;
   let licenseKey: string | undefined;
+  let shouldInstallSkill = false;
+  let force = false;
+  let showVersion = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
+    if (arg === '--version' || arg === '-v') {
+      showVersion = true;
+      continue;
+    }
+    if (arg === '--install-skill') {
+      shouldInstallSkill = true;
+      continue;
+    }
+    if (arg === '--force') {
+      force = true;
+      continue;
+    }
     if (arg === '--no-open') {
       shouldOpen = false;
       continue;
@@ -46,7 +67,7 @@ function parseArgs(argv: string[]): {
     }
     if (!arg.startsWith('-') && !filePath) filePath = path.resolve(arg);
   }
-  return { port, filePath, shouldOpen, licenseKey };
+  return { port, filePath, shouldOpen, licenseKey, shouldInstallSkill, force, showVersion };
 }
 
 function canListen(port: number): Promise<boolean> {
@@ -68,6 +89,24 @@ async function nextAvailablePort(start: number): Promise<number> {
 }
 
 const args = parseArgs(process.argv.slice(2));
+if (args.showVersion) {
+  const packageRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')) as {
+    version?: string;
+  };
+  console.log(`akapen ${pkg.version ?? 'unknown'}`);
+  process.exit(0);
+}
+if (args.shouldInstallSkill) {
+  const packageRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const result = installSkill({
+    cwd: process.cwd(),
+    sourceDir: path.join(packageRoot, 'skills', 'akapen'),
+    force: args.force,
+  });
+  console.log(`[akapen] ${result.message}`);
+  process.exit(result.status === 'installed' ? 0 : 1);
+}
 if (args.licenseKey) {
   try {
     const status = await activateLicense(args.licenseKey);

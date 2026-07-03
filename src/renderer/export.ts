@@ -8,7 +8,8 @@
  * 純関数＝ハーネス/ランナーから直接検証できる（C17/C18）。
  */
 import { acceptView, parseCritic } from "@akapen/markup";
-import { buildCriticMarkupReadingGuide, buildSummary, countChanges } from "@akapen/markup";
+import { buildCriticMarkupReadingGuide, countChanges } from "@akapen/markup";
+import { buildExportHeader, type ExportSettings } from "./ui/export-settings";
 
 export function normalizeSplitInsertionBreaksForExport(md: string): string {
   let normalized = md;
@@ -37,7 +38,20 @@ export interface BuildReviewInput {
   globalNote: string;
   baseFileName: string;
   reviewedAt: string;
+  language?: 'ja' | 'en';
+  exportSettings?: ExportSettings;
 }
+
+const normalizeLanguage = (language: BuildReviewInput['language']): 'ja' | 'en' =>
+  language === 'en' ? 'en' : 'ja';
+
+const changesSummary = (
+  c: ReturnType<typeof countChanges>,
+  language: 'ja' | 'en',
+): string =>
+  language === 'en'
+    ? `delete ${c.deletion}, add ${c.insertion}, instruction ${c.comment}`
+    : `削除${c.deletion}・追記${c.insertion}・指示${c.comment}`;
 
 export function buildReviewContent(state: BuildReviewInput): {
   content: string;
@@ -54,33 +68,28 @@ export function buildReviewContent(state: BuildReviewInput): {
   const hasCriticMarks = nodes.some((n) => n.kind !== "text");
   const unchanged = !hasCriticMarks;
   const body = unchanged ? state.baseOriginal : bodyMd;
+  const language = normalizeLanguage(state.language);
 
   const c = countChanges(nodes, state.globalNote);
+  const defaultHeader = buildCriticMarkupReadingGuide(nodes, {
+    globalNote: state.globalNote,
+    baseText: state.baseOriginal,
+    language,
+  });
 
   const content = [
     "---",
     `base: ${yamlStr(state.baseFileName)}`,
     `reviewed_at: ${yamlStr(state.reviewedAt)}`,
-    `changes: ${yamlStr(`削除${c.deletion}・追記${c.insertion}・指示${c.comment}`)}`,
+    `changes: ${yamlStr(changesSummary(c, language))}`,
     `generator: ${yamlStr("AkaPen v1")}`,
     "---",
     "",
-    "# レビューサマリ（AI はまずここを読む）",
-    "",
-    unchanged
-      ? "変更なし"
-      : buildSummary(nodes, { globalNote: state.globalNote, baseText: state.baseOriginal }),
+    buildExportHeader(defaultHeader, state.exportSettings, language),
     "",
     "---",
     "",
-    buildCriticMarkupReadingGuide(nodes, {
-      globalNote: state.globalNote,
-      baseText: state.baseOriginal,
-    }),
-    "",
-    "---",
-    "",
-    "# 本文（添削入り全文・CriticMarkup 記法）",
+    language === 'en' ? "# Body (full text with edits in CriticMarkup)" : "# 本文（添削入り全文・CriticMarkup 記法）",
     "",
     body,
     "",

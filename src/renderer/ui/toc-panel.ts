@@ -5,6 +5,7 @@
  * - 開閉時は onToggle コールバックで app 側（paneSync/marginNotes）に通知。
  * - 表示専用＝元データ（workingMd / base）には一切書き込まない。
  */
+import { onLanguageChange, t } from '../i18n';
 
 export interface TocItem {
   level: number;
@@ -32,12 +33,12 @@ export interface TocPanelHandle {
 export function createTocPanel(options: TocPanelOptions): TocPanelHandle {
   const element = document.createElement('aside');
   element.className = 'akapen-toc-panel';
-  element.setAttribute('aria-label', '目次');
+  element.setAttribute('aria-label', t('toc.label'));
   element.setAttribute('aria-hidden', 'true');
   element.innerHTML = `
     <div class="akapen-toc-panel__header">
-      <span class="akapen-toc-panel__title">目次</span>
-      <button type="button" class="akapen-toc-panel__close" aria-label="目次パネルを閉じる">✕</button>
+      <span class="akapen-toc-panel__title">${t('toc.label')}</span>
+      <button type="button" class="akapen-toc-panel__close" aria-label="${t('toc.close')}">✕</button>
     </div>
     <nav class="akapen-toc-panel__nav">
       <ul class="akapen-toc-panel__list" data-role="toc-list"></ul>
@@ -46,9 +47,38 @@ export function createTocPanel(options: TocPanelOptions): TocPanelHandle {
 
   const list = element.querySelector<HTMLUListElement>('[data-role="toc-list"]')!;
   const closeButton = element.querySelector<HTMLButtonElement>('.akapen-toc-panel__close')!;
+  const title = element.querySelector<HTMLSpanElement>('.akapen-toc-panel__title')!;
 
   let open = false;
   let itemSignature = '';
+  let currentItems: TocItem[] = [];
+
+  const renderText = (): void => {
+    element.setAttribute('aria-label', t('toc.label'));
+    title.textContent = t('toc.label');
+    closeButton.setAttribute('aria-label', t('toc.close'));
+    renderItems(currentItems, { force: true });
+  };
+
+  const renderItems = (items: TocItem[], opts: { force?: boolean } = {}): void => {
+    const sig = items.map((i) => `${i.level}:${i.text}`).join('\0');
+    if (!opts.force && sig === itemSignature) return;
+    itemSignature = sig;
+    list.textContent = '';
+    items.forEach((item, index) => {
+      const li = document.createElement('li');
+      li.className = `akapen-toc-item akapen-toc-item--h${item.level}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = item.text.trim() || t('toc.emptyHeading');
+      btn.addEventListener('click', () => {
+        options.onJump(index);
+      });
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  };
+  onLanguageChange(renderText);
 
   closeButton.addEventListener('click', () => {
     close();
@@ -81,22 +111,8 @@ export function createTocPanel(options: TocPanelOptions): TocPanelHandle {
       return open;
     },
     setItems(items) {
-      const sig = items.map((i) => `${i.level}:${i.text}`).join('\0');
-      if (sig === itemSignature) return;
-      itemSignature = sig;
-      list.textContent = '';
-      items.forEach((item, index) => {
-        const li = document.createElement('li');
-        li.className = `akapen-toc-item akapen-toc-item--h${item.level}`;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = item.text.trim() || '（空の見出し）';
-        btn.addEventListener('click', () => {
-          options.onJump(index);
-        });
-        li.appendChild(btn);
-        list.appendChild(li);
-      });
+      currentItems = [...items];
+      renderItems(currentItems);
     },
   };
 }

@@ -30,6 +30,7 @@ import {
   undoDepth as pmUndoDepth,
   redoDepth as pmRedoDepth,
 } from "@milkdown/kit/prose/history";
+import { splitBlock as pmSplitBlock } from "@milkdown/kit/prose/commands";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
 import { commonmark } from "@milkdown/kit/preset/commonmark";
 import { Slice } from "@milkdown/kit/prose/model";
@@ -38,6 +39,7 @@ import {
   splitListItem as pmSplitListItem,
 } from "@milkdown/kit/prose/schema-list";
 import { Plugin } from "@milkdown/kit/prose/state";
+import type { Transaction } from "@milkdown/kit/prose/state";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { $prose } from "@milkdown/kit/utils";
 import "@milkdown/kit/prose/view/style/prosemirror.css";
@@ -56,6 +58,7 @@ import { canonicalizeBrLines } from "./md-canonicalize";
 import { createGesturePlugin } from "./gesture";
 import type { GestureMetrics } from "./gesture";
 import { changeSetPlugin, insertionDecoPlugin } from "./changeset-tracker";
+import { AKAPEN_COMMAND_META, markSelectionAsDeletionBeforeEnter } from "./commands";
 
 /** 表示切替の自前全置換 tr の印（insertion-on-type の除外用） */
 export const AKAPEN_SKIP_INSERTION_META = "akapen-skip-insertion";
@@ -119,6 +122,8 @@ export interface WysiwygEditorOptions {
   formatDisplay?: boolean;
   /** J9: mutable registry を読む dynamic shortcut handler */
   shortcutHandler?: (event: KeyboardEvent) => boolean;
+  /** PM doc を独自 keydown 処理で変更した後に app 側同期を走らせる。 */
+  onDocEdited?: () => void;
 }
 
 export interface WysiwygEditorHandle {
@@ -196,7 +201,10 @@ function listItemDepth(view: EditorView): number | null {
   return null;
 }
 
-function handleListEnter(view: EditorView): boolean {
+function handleListEnter(
+  view: EditorView,
+  dispatch = view.dispatch.bind(view),
+): boolean {
   const listItemType = view.state.schema.nodes["list_item"];
   if (!listItemType) return false;
   const depth = listItemDepth(view);
@@ -207,7 +215,7 @@ function handleListEnter(view: EditorView): boolean {
     item.textContent.trim().length === 0
       ? pmLiftListItem(listItemType)
       : pmSplitListItem(listItemType);
-  return command(view.state, view.dispatch);
+  return command(view.state, dispatch);
 }
 
 function insertHardBreak(view: EditorView): boolean {
@@ -223,8 +231,32 @@ function insertHardBreak(view: EditorView): boolean {
   return true;
 }
 
-function handleNativeEditingKey(view: EditorView, event: KeyboardEvent): boolean {
+function handleNativeEditingKey(
+  view: EditorView,
+  event: KeyboardEvent,
+  hooks: {
+    onDocEdited?: () => void;
+    onCommentDeleteBlocked?: () => void;
+  } = {},
+): boolean {
   if (event.key !== "Enter") return false;
+  if (!event.shiftKey && !view.state.selection.empty) {
+    const result = markSelectionAsDeletionBeforeEnter(view, {
+      onCommentDeleteBlocked: hooks.onCommentDeleteBlocked,
+    });
+    if (result === "not-applicable") return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (result === "changed") {
+      const dispatchAsCommand = (tr: Transaction): void => {
+        view.dispatch(tr.setMeta(AKAPEN_COMMAND_META, true));
+      };
+      handleListEnter(view, dispatchAsCommand) ||
+        pmSplitBlock(view.state, dispatchAsCommand);
+      hooks.onDocEdited?.();
+    }
+    return true;
+  }
   const handled = event.shiftKey
     ? insertHardBreak(view)
     : handleListEnter(view);
@@ -250,6 +282,7 @@ export async function createWysiwygEditor(
     loadingEditors,
     formatDisplay: formatDisplayEnabled = false,
     shortcutHandler,
+    onDocEdited,
   } = options;
   // K3.5 段階1（plan6）: 破壊ジェスチャの即時取り消し線プラグイン（作業ペインのみ）。
   // insertion-on-type と同列に .use() する。readOnly ベースペインでは作らない（gesture=false）。
@@ -271,7 +304,10 @@ export async function createWysiwygEditor(
       new Plugin({
         props: {
           handleKeyDown: (view, event) =>
-            handleNativeEditingKey(view, event) ||
+            handleNativeEditingKey(view, event, {
+              onDocEdited,
+              onCommentDeleteBlocked,
+            }) ||
             (shortcutHandler?.(event) ?? false),
         },
       }),

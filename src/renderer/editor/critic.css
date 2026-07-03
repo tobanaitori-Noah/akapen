@@ -45,7 +45,7 @@
 .cm-critic-comment {
   color: var(--akapen-red, #c0392b);
   font-family: var(--font-critic, -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif);
-  background: rgba(192, 57, 43, 0.08);
+  background: var(--akapen-red-soft, rgba(192, 57, 43, 0.08));
   border-radius: 4px;
   padding: 0 3px;
 }

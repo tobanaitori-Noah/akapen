@@ -1,6 +1,6 @@
 import { parseCritic } from './parse.js';
 import { reconcile } from './reconcile.js';
-import { buildCriticMarkupReadingGuide, buildSummary, countChanges } from './summary.js';
+import { buildCriticMarkupReadingGuide, countChanges } from './summary.js';
 import { operationsToCritic } from './operations-to-critic.js';
 import type { Operations } from './operations-to-critic.js';
 
@@ -21,6 +21,7 @@ export interface AssembleInput {
   workingText?: string;
   reviewedAt: string;   // YYYY-MM-DD（呼び出し側が渡す）
   globalNote?: string;  // 全体指示欄
+  language?: 'ja' | 'en';
 }
 
 const yamlStr = (s: string): string =>
@@ -30,6 +31,17 @@ const yamlStr = (s: string): string =>
     .replaceAll('\n', '\\n')
     .replaceAll('\r', '\\r')
     .replaceAll('\t', '\\t')}"`;
+
+const normalizeLanguage = (language: AssembleInput['language']): 'ja' | 'en' =>
+  language === 'en' ? 'en' : 'ja';
+
+const changesSummary = (
+  c: ReturnType<typeof countChanges>,
+  language: 'ja' | 'en',
+): string =>
+  language === 'en'
+    ? `delete ${c.deletion}, add ${c.insertion}, instruction ${c.comment}`
+    : `削除${c.deletion}・追記${c.insertion}・指示${c.comment}`;
 
 /**
  * `.akapen.md` 書き出し文字列を組み立てる。
@@ -59,29 +71,25 @@ export function assembleReviewFile(input: AssembleInput): string {
   }
 
   const nodes = parseCritic(body);
+  const language = normalizeLanguage(input.language);
   const c = countChanges(nodes, input.globalNote);
   return [
     '---',
     `base: ${yamlStr(input.baseFileName)}`,
     `reviewed_at: ${yamlStr(input.reviewedAt)}`,
-    `changes: ${yamlStr(`削除${c.deletion}・追記${c.insertion}・指示${c.comment}`)}`,
+    `changes: ${yamlStr(changesSummary(c, language))}`,
     `generator: ${yamlStr('AkaPen v1')}`,
-    '---',
-    '',
-    '# レビューサマリ（AI はまずここを読む）',
-    '',
-    buildSummary(nodes, { globalNote: input.globalNote, baseText: input.baseText }),
-    '',
     '---',
     '',
     buildCriticMarkupReadingGuide(nodes, {
       globalNote: input.globalNote,
       baseText: input.baseText,
+      language,
     }),
     '',
     '---',
     '',
-    '# 本文（添削入り全文・CriticMarkup 記法）',
+    language === 'en' ? '# Body (full text with edits in CriticMarkup)' : '# 本文（添削入り全文・CriticMarkup 記法）',
     '',
     body,
     '',

@@ -1,5 +1,6 @@
 import { mountApp } from './app';
 import { createLicenseClient, createWebBridge } from './bridge-web';
+import { t } from './i18n';
 import { createLicenseGate } from './license-gate';
 
 const bridge = createWebBridge();
@@ -22,7 +23,7 @@ void fetch('/api/initial-file')
       if (!data) return;
       if ('status' in data) {
         void bridge.showError({
-          message: 'ファイルを開けませんでした',
+          message: t('renderer.openFailed'),
           detail: data.path ? `${data.path}\n${data.message}` : data.message,
         });
         return;
@@ -32,7 +33,7 @@ void fetch('/api/initial-file')
   )
   .catch((error: unknown) => {
     void bridge.showError({
-      message: '初回ファイルの読み込みに失敗しました',
+      message: t('renderer.initialFileFailed'),
       detail: error instanceof Error ? error.message : String(error),
     });
   });

@@ -2,6 +2,7 @@ import type { AkapenBridge } from './bridge';
 import type { LicenseStatus } from '../server/lib/license';
 import { showChooseDialog, showConfirmDialog, showErrorDialog } from './dialogs';
 import { showFilePicker, showSaveLocationPicker } from './file-picker';
+import { t } from './i18n';
 
 type OpenPayload = Parameters<Parameters<AkapenBridge['onOpenFile']>[0]>[0];
 type BaseChangedPayload = Parameters<Parameters<AkapenBridge['onBaseChanged']>[0]>[0];
@@ -11,8 +12,6 @@ type WebBridge = AkapenBridge & {
 export type LicenseApiResult =
   | { status: 'ok'; license: LicenseStatus; checkoutUrl: string }
   | { status: 'error'; message: string; checkoutUrl: string };
-
-const OVERWRITE_CONFIRM_MESSAGE = '上書き保存します。よろしいですか？';
 
 async function api<T>(apiPath: string, body?: unknown): Promise<T> {
   const res = await fetch(apiPath, {
@@ -34,16 +33,29 @@ async function api<T>(apiPath: string, body?: unknown): Promise<T> {
 }
 
 export function createLicenseClient() {
+  const notifyChanged = () => window.dispatchEvent(new CustomEvent('akapen:license-changed'));
   return {
     status: () => api<LicenseApiResult>('/api/license/status'),
-    activate: (key: string) => api<LicenseApiResult>('/api/license/activate', { key }),
-    deactivate: () => api<LicenseApiResult>('/api/license/deactivate', {}),
+    activate: async (key: string) => {
+      const result = await api<LicenseApiResult>('/api/license/activate', { key });
+      notifyChanged();
+      return result;
+    },
+    deactivate: async () => {
+      const result = await api<LicenseApiResult>('/api/license/deactivate', {});
+      notifyChanged();
+      return result;
+    },
   };
 }
 
 export function createWebBridge(): WebBridge {
   const listeners = new Map<string, Set<(payload: unknown) => void>>();
   let currentBasePath: string | null = null;
+  let premiumCache: { value: boolean; checkedAt: number } | null = null;
+  window.addEventListener('akapen:license-changed', () => {
+    premiumCache = null;
+  });
 
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${protocol}://${location.host}`);
@@ -84,7 +96,7 @@ export function createWebBridge(): WebBridge {
       | { status: 'exists'; path: string }
     >(apiPath, body);
     if (first.status !== 'exists') return first;
-    const ok = await showConfirmDialog(OVERWRITE_CONFIRM_MESSAGE, first.path);
+    const ok = await showConfirmDialog(t('dialog.overwriteConfirm'), first.path);
     if (!ok) return { status: 'cancelled' };
     return api(apiPath, { ...body, overwrite: true });
   }
@@ -130,6 +142,24 @@ export function createWebBridge(): WebBridge {
     writeShortcuts: (settings) => api('/api/settings/shortcuts', settings),
     readSettings: () => api('/api/settings/app'),
     writeSettings: (settings) => api('/api/settings/app', settings),
+    async isPremiumUnlocked() {
+      const now = Date.now();
+      if (premiumCache && now - premiumCache.checkedAt < 30_000) {
+        return premiumCache.value;
+      }
+      const result = await api<LicenseApiResult>('/api/license/status');
+      const value = result.status === 'ok' && result.license.licensed;
+      premiumCache = { value, checkedAt: now };
+      return value;
+    },
+    async setActiveFile(filePath) {
+      currentBasePath = filePath;
+      await api('/api/file/active', { path: filePath });
+    },
+    async closeFile(filePath) {
+      if (currentBasePath === filePath) currentBasePath = null;
+      await api('/api/file/close', { path: filePath });
+    },
     async getPathForFile(file) {
       const result = await api<{ status: 'ok'; path: string } | { status: 'error'; message: string }>(
         '/api/file/drop',

@@ -5,6 +5,7 @@
  *   G6: 「完了」を「保存」に改名し、隣に「▼」ドロップダウン（名前をつけて保存）を追加。
  */
 import type { ViewMode } from '../state';
+import { onLanguageChange, t } from '../i18n';
 
 /** G4: TOC に出す見出し1件（pos は app 側が保持＝ここは表示だけ） */
 export interface OutlineHeading {
@@ -31,6 +32,8 @@ export interface ToolbarHandle {
   setViewMode(mode: ViewMode): void;
   setGlobalNote(value: string): void;
   setUndoRedoState(canUndo: boolean, canRedo: boolean): void;
+  flashUndo(): void;
+  flashRedo(): void;
   /** G4: TOC の open/close 状態をボタン表示に反映 */
   setTocOpen(open: boolean): void;
 }
@@ -42,35 +45,39 @@ const CODE_ICON =
   '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>';
 const KEYBOARD_ICON =
   '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h.01M11 9h.01M15 9h.01M19 9h.01M7 13h.01M11 13h.01M15 13h.01M17 17H7"/></svg>';
+const UNDO_ICON =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-1"/></svg>';
+const REDO_ICON =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h1"/></svg>';
 
 export function createToolbar(options: ToolbarOptions): ToolbarHandle {
   const element = document.createElement('header');
   element.className = 'akapen-toolbar';
   element.innerHTML = `
     <div class="akapen-toolbar__undoredo">
-      <button type="button" data-action="undo" aria-label="取り消す" data-tooltip="取り消す（⌘Z）" disabled>◀︎</button><button type="button" data-action="redo" aria-label="やり直す" data-tooltip="やり直す（⇧⌘Z）" disabled>▶︎</button>
+      <button type="button" data-action="undo" aria-label="${t('toolbar.undo')}" data-tooltip="${t('toolbar.undoTooltip')}" disabled>${UNDO_ICON}</button><button type="button" data-action="redo" aria-label="${t('toolbar.redo')}" data-tooltip="${t('toolbar.redoTooltip')}" disabled>${REDO_ICON}</button>
     </div>
-    <button type="button" data-action="open" data-tooltip="現在のデータを破棄して、新しいマークダウンファイルを開く">開く</button>
+    <button type="button" data-action="open" data-tooltip="${t('toolbar.openTooltip')}">${t('toolbar.open')}</button>
     <div class="akapen-toolbar__save-group">
-      <button type="button" data-action="save" data-tooltip="元のファイルと同じ場所に <ファイル名>.akapen.md として保存" disabled>保存</button>
-      <button type="button" data-action="save-as-toggle" aria-label="保存メニューを開く" aria-haspopup="true" aria-expanded="false" disabled>▼</button>
+      <button type="button" data-action="save" data-tooltip="${t('toolbar.saveTooltip')}" disabled>${t('toolbar.save')}</button>
+      <button type="button" data-action="save-as-toggle" aria-label="${t('toolbar.saveMenu')}" aria-haspopup="true" aria-expanded="false" disabled>▼</button>
       <ul class="akapen-save-dropdown" data-role="save-dropdown" hidden>
-        <li><button type="button" data-action="save-as">名前をつけて保存</button></li>
+        <li><button type="button" data-action="save-as">${t('toolbar.saveAs')}</button></li>
       </ul>
     </div>
     <div class="akapen-global-note" data-role="global-note-wrap">
-      <input type="text" data-role="global-note" placeholder="全体指示（書き出し時に添える・任意）" disabled />
-      <textarea data-role="global-note-textarea" placeholder="全体指示（書き出し時に添える・任意）" rows="4" hidden disabled></textarea>
-      <button type="button" data-action="global-note-toggle" aria-label="全体指示欄を広げる" aria-expanded="false" data-tooltip="全体指示 入力エリアを広げる" disabled>▼</button>
+      <input type="text" data-role="global-note" placeholder="${t('toolbar.globalNotePlaceholder')}" disabled />
+      <textarea data-role="global-note-textarea" placeholder="${t('toolbar.globalNotePlaceholder')}" rows="4" hidden disabled></textarea>
+      <button type="button" data-action="global-note-toggle" aria-label="${t('toolbar.globalNoteExpand')}" aria-expanded="false" data-tooltip="${t('toolbar.globalNoteExpandTooltip')}" disabled>▼</button>
     </div>
     <div class="akapen-toolbar__right" data-role="toolbar-right">
-      <div class="akapen-view-switch" role="group" aria-label="表示モード" data-view-mode="preview">
-        <button type="button" data-action="view-mode" data-mode="preview" class="is-active" aria-pressed="true" disabled>${EYE_ICON}ビュワー</button>
-        <button type="button" data-action="view-mode" data-mode="source" aria-pressed="false" disabled>${CODE_ICON}コード</button>
+      <div class="akapen-view-switch" role="group" aria-label="${t('toolbar.viewMode')}" data-view-mode="preview">
+        <button type="button" data-action="view-mode" data-mode="preview" class="is-active" aria-pressed="true" disabled>${EYE_ICON}<span data-role="viewer-label">${t('toolbar.viewer')}</span></button>
+        <button type="button" data-action="view-mode" data-mode="source" aria-pressed="false" disabled>${CODE_ICON}<span data-role="code-label">${t('toolbar.code')}</span></button>
       </div>
-      <button type="button" data-action="toc-toggle" aria-label="見出しパネルを開く" aria-expanded="false" class="akapen-toc-toggle" data-tooltip="見出し" disabled>☰</button>
+      <button type="button" class="akapen-shortcuts-button" data-action="shortcut-settings" aria-label="${t('toolbar.shortcutSettings')}" data-tooltip="${t('toolbar.shortcutSettings')}">${KEYBOARD_ICON}</button>
+      <button type="button" data-action="toc-toggle" aria-label="${t('toolbar.tocOpen')}" aria-expanded="false" class="akapen-toc-toggle" data-tooltip="${t('toolbar.tocTooltip')}" disabled>☰</button>
     </div>
-    <button type="button" class="akapen-shortcuts-button" data-action="shortcut-settings" aria-label="ショートカットの変更" data-tooltip="ショートカットの変更">${KEYBOARD_ICON}</button>
     <div class="akapen-tooltip" data-role="tooltip" hidden></div>
   `;
 
@@ -84,6 +91,10 @@ export function createToolbar(options: ToolbarOptions): ToolbarHandle {
   const segmentButtons = Array.from(
     element.querySelectorAll<HTMLButtonElement>('[data-action="view-mode"]'),
   );
+  const viewSwitchPill = document.createElement('div');
+  viewSwitchPill.className = 'akapen-view-switch__pill';
+  viewSwitchPill.setAttribute('aria-hidden', 'true');
+  viewSwitch.prepend(viewSwitchPill);
   const saveButton = query<HTMLButtonElement>('[data-action="save"]');
   const saveAsToggleButton = query<HTMLButtonElement>('[data-action="save-as-toggle"]');
   const saveDropdown = query<HTMLUListElement>('[data-role="save-dropdown"]');
@@ -96,6 +107,101 @@ export function createToolbar(options: ToolbarOptions): ToolbarHandle {
   const tocToggleButton = query<HTMLButtonElement>('[data-action="toc-toggle"]');
   const shortcutSettingsButton = query<HTMLButtonElement>('[data-action="shortcut-settings"]');
   const tooltip = query<HTMLDivElement>('[data-role="tooltip"]');
+  let viewSwitchPillFrame: number | null = null;
+  let undoPressTimer: number | null = null;
+  let redoPressTimer: number | null = null;
+
+  const updateViewSwitchPill = (): void => {
+    viewSwitchPillFrame = null;
+    const activeButton = segmentButtons.find((button) => button.classList.contains('is-active'));
+    if (!activeButton || activeButton.offsetWidth === 0) {
+      viewSwitchPill.style.opacity = '0';
+      return;
+    }
+    viewSwitchPill.style.width = `${activeButton.offsetWidth}px`;
+    viewSwitchPill.style.transform = `translateX(${activeButton.offsetLeft}px)`;
+    viewSwitchPill.style.opacity = '1';
+  };
+
+  const scheduleViewSwitchPillUpdate = (): void => {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.requestAnimationFrame !== 'function'
+    ) {
+      updateViewSwitchPill();
+      return;
+    }
+    if (viewSwitchPillFrame !== null) {
+      if (typeof window.cancelAnimationFrame === 'function') {
+        window.cancelAnimationFrame(viewSwitchPillFrame);
+      }
+      viewSwitchPillFrame = null;
+    }
+    viewSwitchPillFrame = window.requestAnimationFrame(updateViewSwitchPill);
+  };
+
+  const viewSwitchResizeObserver =
+    typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(() => scheduleViewSwitchPillUpdate());
+  viewSwitchResizeObserver?.observe(viewSwitch);
+
+  const flashUndoButton = (): void => {
+    if (undoButton.disabled) return;
+    undoButton.classList.remove('is-pressing');
+    void undoButton.offsetWidth;
+    undoButton.classList.add('is-pressing');
+    if (undoPressTimer !== null) window.clearTimeout(undoPressTimer);
+    undoPressTimer = window.setTimeout(() => {
+      undoButton.classList.remove('is-pressing');
+      undoPressTimer = null;
+    }, 180);
+  };
+
+  const flashRedoButton = (): void => {
+    if (redoButton.disabled) return;
+    redoButton.classList.remove('is-pressing');
+    void redoButton.offsetWidth;
+    redoButton.classList.add('is-pressing');
+    if (redoPressTimer !== null) window.clearTimeout(redoPressTimer);
+    redoPressTimer = window.setTimeout(() => {
+      redoButton.classList.remove('is-pressing');
+      redoPressTimer = null;
+    }, 180);
+  };
+
+  const renderText = (): void => {
+    undoButton.setAttribute('aria-label', t('toolbar.undo'));
+    undoButton.dataset.tooltip = t('toolbar.undoTooltip');
+    redoButton.setAttribute('aria-label', t('toolbar.redo'));
+    redoButton.dataset.tooltip = t('toolbar.redoTooltip');
+    const openButton = query<HTMLButtonElement>('[data-action="open"]');
+    openButton.textContent = t('toolbar.open');
+    openButton.dataset.tooltip = t('toolbar.openTooltip');
+    saveButton.textContent = t('toolbar.save');
+    saveButton.dataset.tooltip = t('toolbar.saveTooltip');
+    saveAsToggleButton.setAttribute('aria-label', t('toolbar.saveMenu'));
+    query<HTMLButtonElement>('[data-action="save-as"]').textContent = t('toolbar.saveAs');
+    noteInput.placeholder = t('toolbar.globalNotePlaceholder');
+    noteTextarea.placeholder = t('toolbar.globalNotePlaceholder');
+    const expanded = noteWrap.classList.contains('is-expanded');
+    noteToggleButton.setAttribute(
+      'aria-label',
+      expanded ? t('toolbar.globalNoteCollapse') : t('toolbar.globalNoteExpand'),
+    );
+    noteToggleButton.dataset.tooltip = expanded
+      ? t('toolbar.globalNoteCollapseTooltip')
+      : t('toolbar.globalNoteExpandTooltip');
+    viewSwitch.setAttribute('aria-label', t('toolbar.viewMode'));
+    query<HTMLSpanElement>('[data-role="viewer-label"]').textContent = t('toolbar.viewer');
+    query<HTMLSpanElement>('[data-role="code-label"]').textContent = t('toolbar.code');
+    const tocOpen = tocToggleButton.getAttribute('aria-expanded') === 'true';
+    tocToggleButton.setAttribute('aria-label', tocOpen ? t('toolbar.tocClose') : t('toolbar.tocOpen'));
+    tocToggleButton.dataset.tooltip = t('toolbar.tocTooltip');
+    shortcutSettingsButton.setAttribute('aria-label', t('toolbar.shortcutSettings'));
+    shortcutSettingsButton.dataset.tooltip = t('toolbar.shortcutSettings');
+    scheduleViewSwitchPillUpdate();
+  };
 
   let tooltipTimer: number | null = null;
   const hideTooltip = (): void => {
@@ -156,9 +262,11 @@ export function createToolbar(options: ToolbarOptions): ToolbarHandle {
     options.onSave();
   });
   undoButton.addEventListener('click', () => {
+    flashUndoButton();
     options.onUndo();
   });
   redoButton.addEventListener('click', () => {
+    flashRedoButton();
     options.onRedo();
   });
   query<HTMLButtonElement>('[data-action="save-as"]').addEventListener('click', (e) => {
@@ -195,14 +303,17 @@ export function createToolbar(options: ToolbarOptions): ToolbarHandle {
     noteToggleButton.setAttribute('aria-expanded', String(expanded));
     noteToggleButton.setAttribute(
       'aria-label',
-      expanded ? '全体指示欄を1行に戻す' : '全体指示欄を広げる',
+      expanded ? t('toolbar.globalNoteCollapse') : t('toolbar.globalNoteExpand'),
     );
     noteToggleButton.dataset.tooltip = expanded
-      ? '全体指示 入力エリアを縮小'
-      : '全体指示 入力エリアを広げる';
+      ? t('toolbar.globalNoteCollapseTooltip')
+      : t('toolbar.globalNoteExpandTooltip');
     if (expanded) noteTextarea.focus();
     else noteInput.focus();
   });
+
+  onLanguageChange(renderText);
+  renderText();
 
   return {
     element,
@@ -224,6 +335,7 @@ export function createToolbar(options: ToolbarOptions): ToolbarHandle {
         button.classList.toggle('is-active', active);
         button.setAttribute('aria-pressed', String(active));
       }
+      scheduleViewSwitchPillUpdate();
     },
     setGlobalNote(value) {
       noteInput.value = value;
@@ -233,9 +345,15 @@ export function createToolbar(options: ToolbarOptions): ToolbarHandle {
       undoButton.disabled = !canUndo;
       redoButton.disabled = !canRedo;
     },
+    flashUndo() {
+      flashUndoButton();
+    },
+    flashRedo() {
+      flashRedoButton();
+    },
     setTocOpen(open) {
       tocToggleButton.setAttribute('aria-expanded', String(open));
-      tocToggleButton.setAttribute('aria-label', open ? '見出しパネルを閉じる' : '見出しパネルを開く');
+      tocToggleButton.setAttribute('aria-label', open ? t('toolbar.tocClose') : t('toolbar.tocOpen'));
       // K5: アイコンは ☰ 固定（開閉でアイコンを変えない）
       tocToggleButton.textContent = '☰';
     },

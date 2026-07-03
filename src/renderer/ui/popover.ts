@@ -23,6 +23,19 @@
  * plan15 追加修正 A: 「コメント削除」は PopOver から廃止し comment-popup.ts 側に移動。
  *   PopOver には「削除解除」だけ残す（削除マーク選択時のみ）。
  */
+import { getLanguage, onLanguageChange, t } from '../i18n';
+import {
+  appendTemplateText,
+  getCommentTemplateText,
+  isCommentTemplateFeatureUnlocked,
+  loadCommentTemplates,
+  recordCommentTemplateUsage,
+  type CommentTemplate,
+} from './comment-templates';
+import {
+  openTemplateSelector,
+  type TemplateSelectorHandle,
+} from './template-selector';
 export interface PopoverTarget {
   /** 'preview'＝Milkdown／'source'＝CM6（source ではマーク解除・整形を出さない） */
   kind: "preview" | "source";
@@ -60,8 +73,49 @@ export interface SelectionPopoverOptions {
 export interface SelectionPopoverHandle {
   element: HTMLElement;
   /** 選択状態を再評価して表示/非表示・位置を更新する */
-  refresh(): void;
+  refresh(options?: SelectionPopoverRefreshOptions): void;
   destroy(): void;
+}
+
+export const POPOVER_TEMPLATE_BUTTON_CLASS = 'akapen-popover__template-button';
+
+interface SelectionPopoverRefreshOptions {
+  force?: boolean;
+  preserveCommentRow?: boolean;
+}
+
+const POPOVER_VIEWPORT_GAP = 12;
+const POPOVER_OFFSET_Y = 6;
+const TEMPLATE_BUTTON_CHEVRON_SVG = `
+            <svg class="akapen-template-button__chevron" aria-hidden="true" viewBox="0 0 12 12" focusable="false">
+              <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>`;
+
+export function buildSelectionPopoverHtml(): string {
+  return `
+    <div class="akapen-popover__row">
+      <button type="button" data-action="popover-delete">${t('popover.delete')}</button>
+      <button type="button" data-action="popover-comment">${t('popover.comment')}</button>
+      <button type="button" data-action="popover-remove-deletion" hidden>${t('popover.removeDeletion')}</button>
+      <div class="akapen-popover__comment">
+        <div class="akapen-popover__comment-input-row">
+          <input type="text" data-role="comment-input" placeholder="${t('popover.instructionPlaceholder')}" />
+          <button type="button" class="${POPOVER_TEMPLATE_BUTTON_CLASS}" data-action="popover-comment-template" aria-label="${t('commentTemplate.buttonTooltip')}" title="${t('commentTemplate.buttonTooltip')}">
+            <span class="akapen-template-button__label">${t('commentTemplate.button')}</span>
+${TEMPLATE_BUTTON_CHEVRON_SVG}
+          </button>
+          <button type="button" data-action="popover-comment-confirm">${t('popover.confirm')}</button>
+        </div>
+      </div>
+    </div>
+    <div class="akapen-popover__row akapen-popover__format" role="group" aria-label="${t('popover.markdownFormat')}">
+      <button type="button" data-action="popover-h1" aria-label="${t('popover.heading1')}">H1</button>
+      <button type="button" data-action="popover-h2" aria-label="${t('popover.heading2')}">H2</button>
+      <button type="button" data-action="popover-h3" aria-label="${t('popover.heading3')}">H3</button>
+      <button type="button" data-action="popover-bold" aria-label="${t('popover.bold')}">${t('shortcut.bold')}</button>
+      <button type="button" data-action="popover-bullet" aria-label="${t('popover.bulletList')}">${t('shortcut.bulletList')}</button>
+    </div>
+  `;
 }
 
 export function createSelectionPopover(
@@ -69,24 +123,7 @@ export function createSelectionPopover(
 ): SelectionPopoverHandle {
   const element = document.createElement("div");
   element.className = "akapen-popover";
-  element.innerHTML = `
-    <div class="akapen-popover__row">
-      <button type="button" data-action="popover-delete">削除</button>
-      <button type="button" data-action="popover-comment">コメント</button>
-      <button type="button" data-action="popover-remove-deletion" hidden>削除解除</button>
-      <span class="akapen-popover__comment">
-        <input type="text" data-role="comment-input" placeholder="添削指示" />
-        <button type="button" data-action="popover-comment-confirm">確定</button>
-      </span>
-    </div>
-    <div class="akapen-popover__row akapen-popover__format" role="group" aria-label="Markdown 整形">
-      <button type="button" data-action="popover-h1" aria-label="見出し1にする">H1</button>
-      <button type="button" data-action="popover-h2" aria-label="見出し2にする">H2</button>
-      <button type="button" data-action="popover-h3" aria-label="見出し3にする">H3</button>
-      <button type="button" data-action="popover-bold" aria-label="太字にする">太字</button>
-      <button type="button" data-action="popover-bullet" aria-label="箇条書きにする">箇条書き</button>
-    </div>
-  `;
+  element.innerHTML = buildSelectionPopoverHtml();
   options.container.appendChild(element);
 
   const query = <T extends HTMLElement>(selector: string): T => {
@@ -94,8 +131,11 @@ export function createSelectionPopover(
     if (!el) throw new Error(`popover: ${selector} not found`);
     return el;
   };
-  const commentRow = query<HTMLSpanElement>(".akapen-popover__comment");
+  const commentRow = query<HTMLDivElement>(".akapen-popover__comment");
+  const commentInputRow = query<HTMLDivElement>(".akapen-popover__comment-input-row");
   const commentInput = query<HTMLInputElement>('[data-role="comment-input"]');
+  const templateBtn = query<HTMLButtonElement>('[data-action="popover-comment-template"]');
+  const btnConfirmComment = query<HTMLButtonElement>('[data-action="popover-comment-confirm"]');
   const btnRemoveDeletion = query<HTMLButtonElement>(
     '[data-action="popover-remove-deletion"]',
   );
@@ -105,15 +145,164 @@ export function createSelectionPopover(
   const btnDeleteAction = query<HTMLButtonElement>(
     '[data-action="popover-delete"]',
   );
+  const renderText = (): void => {
+    btnDeleteAction.textContent = t('popover.delete');
+    btnComment.textContent = t('popover.comment');
+    btnRemoveDeletion.textContent = t('popover.removeDeletion');
+    commentInput.placeholder = t('popover.instructionPlaceholder');
+    templateBtn.querySelector<HTMLElement>('.akapen-template-button__label')!.textContent =
+      t('commentTemplate.button');
+    templateBtn.setAttribute('aria-label', t('commentTemplate.buttonTooltip'));
+    templateBtn.title = t('commentTemplate.buttonTooltip');
+    btnConfirmComment.textContent = t('popover.confirm');
+    query<HTMLDivElement>('.akapen-popover__format').setAttribute('aria-label', t('popover.markdownFormat'));
+    query<HTMLButtonElement>('[data-action="popover-h1"]').setAttribute('aria-label', t('popover.heading1'));
+    query<HTMLButtonElement>('[data-action="popover-h2"]').setAttribute('aria-label', t('popover.heading2'));
+    query<HTMLButtonElement>('[data-action="popover-h3"]').setAttribute('aria-label', t('popover.heading3'));
+    const bold = query<HTMLButtonElement>('[data-action="popover-bold"]');
+    bold.setAttribute('aria-label', t('popover.bold'));
+    bold.textContent = t('shortcut.bold');
+    const bullet = query<HTMLButtonElement>('[data-action="popover-bullet"]');
+    bullet.setAttribute('aria-label', t('popover.bulletList'));
+    bullet.textContent = t('shortcut.bulletList');
+  };
+  const unsubscribeLanguage = onLanguageChange(renderText);
+
+  let templates: CommentTemplate[] | null = null;
+  let templateSelector: TemplateSelectorHandle | null = null;
+  let templateLoading = false;
+  let commentLens: HTMLElement | null = null;
+  let lastTargetKey: string | null = null;
+
+  const notifyPremiumRequired = (): void => {
+    void window.dispatchEvent(
+      new CustomEvent('akapen:premium-required', {
+        detail: { feature: 'comment-templates' },
+      }),
+    );
+  };
+
+  const closeTemplateSelector = (): void => {
+    templateSelector?.close();
+    templateSelector = null;
+  };
+
+  const removeCommentLens = (): void => {
+    options.container
+      .querySelectorAll('.akapen-comment-editing-lens')
+      .forEach((node) => node.remove());
+    commentLens?.remove();
+    commentLens = null;
+  };
+
+  const showCommentLens = (): void => {
+    removeCommentLens();
+    const selection = document.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+    const range = selection.getRangeAt(0);
+    const containerRect = options.container.getBoundingClientRect();
+    const rects = Array.from(range.getClientRects()).filter((rect) => {
+      if (rect.width < 1 || rect.height < 1) return false;
+      return (
+        rect.right > containerRect.left &&
+        rect.left < containerRect.right &&
+        rect.bottom > containerRect.top &&
+        rect.top < containerRect.bottom
+      );
+    });
+    if (rects.length === 0) return;
+
+    const lens = document.createElement('div');
+    lens.className = 'akapen-comment-editing-lens';
+    lens.setAttribute('aria-hidden', 'true');
+    for (const rect of rects) {
+      const segment = document.createElement('div');
+      segment.className = 'akapen-comment-editing-lens__segment';
+      segment.style.left = `${rect.left - containerRect.left + options.container.scrollLeft}px`;
+      segment.style.top = `${rect.top - containerRect.top + options.container.scrollTop}px`;
+      segment.style.width = `${rect.width}px`;
+      segment.style.height = `${rect.height}px`;
+      lens.appendChild(segment);
+    }
+    options.container.appendChild(lens);
+    commentLens = lens;
+  };
+
+  const openTemplateSelectorFromButton = async (): Promise<void> => {
+    if (templateSelector) {
+      closeTemplateSelector();
+      commentInput.focus();
+      return;
+    }
+    if (templateLoading) return;
+    templateLoading = true;
+    templateBtn.disabled = true;
+    let unlocked = false;
+    try {
+      unlocked = await isCommentTemplateFeatureUnlocked();
+    } catch {
+      unlocked = false;
+    }
+    if (!unlocked) {
+      templateLoading = false;
+      templateBtn.disabled = false;
+      notifyPremiumRequired();
+      return;
+    }
+    try {
+      templates ??= await loadCommentTemplates();
+    } catch {
+      templates = [];
+    } finally {
+      templateLoading = false;
+      templateBtn.disabled = false;
+    }
+    if (templateSelector) return;
+    refresh({ force: true });
+    templateSelector = openTemplateSelector({
+      templates: templates ?? [],
+      mount: element,
+      anchor: commentInputRow,
+      widthElement: commentInputRow,
+      returnFocus: commentInput,
+    });
+    const selected = await templateSelector.result;
+    templateSelector = null;
+    if (!element.isConnected) return;
+    if (!selected) {
+      commentInput.focus();
+      return;
+    }
+    commentInput.value = appendTemplateText(
+      commentInput.value,
+      getCommentTemplateText(selected, getLanguage()),
+    );
+    commentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    void recordCommentTemplateUsage(selected.id)
+      .then((updated) => {
+        templates = updated;
+      })
+      .catch(() => undefined);
+    commentInput.focus();
+  };
 
   const closeCommentRow = (): void => {
+    element.classList.remove("is-comment-open");
     commentRow.classList.remove("is-open");
+    closeTemplateSelector();
+    removeCommentLens();
     commentInput.value = "";
   };
   const hide = (): void => {
     element.classList.remove("is-open");
+    lastTargetKey = null;
     closeCommentRow();
   };
+
+  const targetKeyFor = (target: PopoverTarget): string =>
+    `${target.kind}:${Math.round(target.coords?.left ?? -1)}:${Math.round(
+      target.coords?.bottom ?? -1,
+    )}`;
 
   /** plan15 C-2 + 追加修正A/B/C: コンテキスト別ボタン表示・disabled 制御。
    * - 削除解除: 削除マーク選択時のみ表示。
@@ -158,18 +347,25 @@ export function createSelectionPopover(
   });
 
   query('[data-action="popover-comment"]').addEventListener("click", () => {
+    showCommentLens();
+    element.classList.add("is-comment-open");
     commentRow.classList.add("is-open");
+    refresh({ force: true, preserveCommentRow: true });
     commentInput.focus();
+    requestAnimationFrame(() =>
+      refresh({ force: true, preserveCommentRow: true }),
+    );
   });
-  query('[data-action="popover-comment-confirm"]').addEventListener(
-    "click",
-    () => {
-      const instruction = commentInput.value.trim();
-      if (instruction === "") return;
-      closeCommentRow();
-      options.onComment(instruction);
-    },
-  );
+  templateBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    void openTemplateSelectorFromButton();
+  });
+  btnConfirmComment.addEventListener("click", () => {
+    const instruction = commentInput.value.trim();
+    if (instruction === "") return;
+    closeCommentRow();
+    options.onComment(instruction);
+  });
   // 修正 F 改: Enter 2 回確定（IME 配慮）
   // IME 変換中（isComposing=true）は何もしない（変換確定を許可）。
   // 変換中でない Enter: 1 回目は preventDefault + enterPending=true、
@@ -217,14 +413,24 @@ export function createSelectionPopover(
     options.onBulletList();
   });
 
-  const refresh = (): void => {
+  const refresh = (
+    refreshOptions: SelectionPopoverRefreshOptions = {},
+  ): void => {
     const target = options.getTarget();
     if (!target || target.empty || !target.coords) {
       hide();
       return;
     }
+    const targetKey = targetKeyFor(target);
+    const targetChanged = lastTargetKey !== null && lastTargetKey !== targetKey;
+    if (targetChanged && !refreshOptions.preserveCommentRow) {
+      closeCommentRow();
+    }
+    lastTargetKey = targetKey;
     // 指示文の入力中（フォーカスがポップオーバー内）は位置を据え置いて出しっぱなし
     if (
+      !refreshOptions.force &&
+      !targetChanged &&
       element.classList.contains("is-open") &&
       element.contains(document.activeElement)
     ) {
@@ -241,19 +447,49 @@ export function createSelectionPopover(
       target.coords.bottom -
       containerRect.top +
       options.container.scrollTop +
-      6;
+      POPOVER_OFFSET_Y;
     element.style.left = `${Math.max(0, left)}px`;
     element.style.top = `${Math.max(0, top)}px`;
     element.classList.add("is-open");
+
+    const rect = element.getBoundingClientRect();
+    let nextLeft = Math.max(0, left);
+    let nextTop = Math.max(0, top);
+    const viewportRight = window.innerWidth - POPOVER_VIEWPORT_GAP;
+    const viewportBottom = window.innerHeight - POPOVER_VIEWPORT_GAP;
+    if (rect.right > viewportRight) nextLeft -= rect.right - viewportRight;
+    if (rect.left < POPOVER_VIEWPORT_GAP) nextLeft += POPOVER_VIEWPORT_GAP - rect.left;
+    if (rect.bottom > viewportBottom) nextTop -= rect.bottom - viewportBottom;
+    if (rect.top < POPOVER_VIEWPORT_GAP) nextTop += POPOVER_VIEWPORT_GAP - rect.top;
+    element.style.left = `${Math.max(0, Math.round(nextLeft))}px`;
+    element.style.top = `${Math.max(0, Math.round(nextTop))}px`;
   };
 
-  document.addEventListener("selectionchange", refresh);
+  const onSelectionChange = (): void => refresh();
+  const onDocumentMouseDown = (event: MouseEvent): void => {
+    if (!element.classList.contains("is-open")) return;
+    const target = event.target;
+    if (!(target instanceof Node) || element.contains(target)) return;
+    if (!options.container.contains(target)) {
+      hide();
+      return;
+    }
+    if (element.classList.contains("is-comment-open")) {
+      closeCommentRow();
+    }
+  };
+  document.addEventListener("selectionchange", onSelectionChange);
+  document.addEventListener("mousedown", onDocumentMouseDown, true);
 
   return {
     element,
     refresh,
     destroy() {
-      document.removeEventListener("selectionchange", refresh);
+      unsubscribeLanguage();
+      document.removeEventListener("selectionchange", onSelectionChange);
+      document.removeEventListener("mousedown", onDocumentMouseDown, true);
+      closeTemplateSelector();
+      removeCommentLens();
       element.remove();
     },
   };

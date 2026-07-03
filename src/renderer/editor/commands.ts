@@ -9,6 +9,8 @@ import { editorViewCtx } from "@milkdown/kit/core";
 import type { MarkType, Node as PMNode } from "@milkdown/kit/prose/model";
 import { toggleMark as pmToggleMark } from "@milkdown/kit/prose/commands";
 import { wrapInList as pmWrapInList } from "@milkdown/kit/prose/schema-list";
+import { Selection } from "@milkdown/kit/prose/state";
+import type { EditorView } from "@milkdown/kit/prose/view";
 
 /** コマンド適用 tr の印（旧 insertion-on-type の除外用・後方互換のため残す）。 */
 export const AKAPEN_COMMAND_META = "akapen-command";
@@ -568,6 +570,83 @@ export function applyDeletion(ctx: CommandContext): boolean {
   });
 }
 
+export type EnterSelectionDeletionResult = "changed" | "handled" | "not-applicable";
+
+/**
+ * preview で非空選択の Enter を押した時に、PM の既定挙動が選択文字を物理削除する前に
+ * 削除マーク化する。改行そのものは呼び出し側（milkdown.ts）が、この処理後に PM の
+ * splitBlock/list split として実行する。
+ */
+export function markSelectionAsDeletionBeforeEnter(
+  view: EditorView,
+  opts: { onCommentDeleteBlocked?: () => void } = {},
+): EnterSelectionDeletionResult {
+  const { from, to, empty } = view.state.selection;
+  if (empty) return "not-applicable";
+
+  const commentMarkType = view.state.schema.marks["criticComment"];
+  const highlightMarkType = view.state.schema.marks["criticHighlight"];
+  let hasComment = false;
+  view.state.doc.nodesBetween(from, to, (node) => {
+    if (hasComment) return false;
+    if (node.isText) {
+      if (commentMarkType?.isInSet(node.marks)) hasComment = true;
+      if (highlightMarkType?.isInSet(node.marks)) hasComment = true;
+    }
+    return true;
+  });
+  if (hasComment) {
+    opts.onCommentDeleteBlocked?.();
+    return "handled";
+  }
+
+  const deletionMarkType = view.state.schema.marks["criticDeletion"];
+  const insertionMarkType = view.state.schema.marks["criticInsertion"];
+  if (!deletionMarkType) return "handled";
+  if (rangeHasMark(view.state.doc, { from, to }, deletionMarkType)) {
+    return "handled";
+  }
+
+  const ranges: Array<{ from: number; to: number; inserted: boolean }> = [];
+  view.state.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText) return true;
+    const textLen = node.text?.length ?? 0;
+    const rangeFrom = Math.max(from, pos);
+    const rangeTo = Math.min(to, pos + textLen);
+    if (rangeFrom >= rangeTo) return false;
+    ranges.push({
+      from: rangeFrom,
+      to: rangeTo,
+      inserted: Boolean(insertionMarkType?.isInSet(node.marks)),
+    });
+    return false;
+  });
+  if (ranges.length === 0) return "handled";
+
+  let tr = view.state.tr;
+  for (const range of ranges) {
+    const mappedFrom = tr.mapping.map(range.from, -1);
+    const mappedTo = tr.mapping.map(range.to, 1);
+    if (mappedFrom >= mappedTo) continue;
+    if (range.inserted) {
+      tr = tr.delete(mappedFrom, mappedTo);
+    } else {
+      tr = tr.addMark(mappedFrom, mappedTo, deletionMarkType.create());
+    }
+  }
+  if (tr.steps.length === 0) return "handled";
+
+  const collapsePos = Math.max(
+    0,
+    Math.min(tr.doc.content.size, tr.mapping.map(to, -1)),
+  );
+  tr = tr
+    .setSelection(Selection.near(tr.doc.resolve(collapsePos), -1))
+    .setMeta(AKAPEN_COMMAND_META, true);
+  view.dispatch(tr.scrollIntoView());
+  return "changed";
+}
+
 /**
  * 選択範囲の削除マーク（criticDeletion）を解除する。
  *
@@ -1046,16 +1125,56 @@ function pmTrimSelectionByHeadings(
   const segments: Array<{ from: number; to: number }> = [];
   let cursor = from;
   for (const span of headingSpans) {
-    if (span.start > cursor) segments.push({ from: cursor, to: span.start });
+    if (span.start > cursor) {
+      const trimmed = trimPmTextSegment(doc, cursor, span.start);
+      if (trimmed) segments.push(trimmed);
+    }
     cursor = Math.max(cursor, span.end);
   }
-  if (cursor < to) segments.push({ from: cursor, to });
+  if (cursor < to) {
+    const trimmed = trimPmTextSegment(doc, cursor, to);
+    if (trimmed) segments.push(trimmed);
+  }
 
-  const nonEmpty = segments.filter((s) => s.to > s.from);
-  if (nonEmpty.length === 0) return { kind: "empty" };
-  if (nonEmpty.length === 1)
-    return { kind: "single", from: nonEmpty[0].from, to: nonEmpty[0].to };
-  return { kind: "multiple", segments: nonEmpty };
+  if (segments.length === 0) return { kind: "empty" };
+  if (segments.length === 1)
+    return { kind: "single", from: segments[0].from, to: segments[0].to };
+  return { kind: "multiple", segments };
+}
+
+function trimPmTextSegment(
+  doc: PMNode,
+  from: number,
+  to: number,
+): { from: number; to: number } | null {
+  let first: number | null = null;
+  let last: number | null = null;
+
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText) return true;
+    const text = node.text ?? "";
+    const start = Math.max(from, pos);
+    const end = Math.min(to, pos + node.nodeSize);
+    const startOffset = Math.max(0, start - pos);
+    const endOffset = Math.min(text.length, end - pos);
+
+    for (let i = startOffset; i < endOffset; i += 1) {
+      if (!isTrimChar(text[i])) {
+        if (first === null) first = pos + i;
+        break;
+      }
+    }
+    for (let i = endOffset - 1; i >= startOffset; i -= 1) {
+      if (!isTrimChar(text[i])) {
+        last = Math.max(last ?? -1, pos + i);
+        break;
+      }
+    }
+    return true;
+  });
+
+  if (first === null || last === null || last < first) return null;
+  return { from: first, to: last + 1 };
 }
 
 /**

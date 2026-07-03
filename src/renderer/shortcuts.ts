@@ -1,4 +1,5 @@
 import type { ShortcutSettings } from './bridge';
+import { t, type TranslationKey } from './i18n';
 
 export type ShortcutCommandId =
   | 'delete-mark'
@@ -18,15 +19,15 @@ export type ShortcutCommandId =
 
 export interface ShortcutCommandDefinition {
   id: ShortcutCommandId;
-  label: string;
+  labelKey: TranslationKey;
   defaultBinding: string;
 }
 
 export type ShortcutBindings = Record<ShortcutCommandId, string>;
 
 export const SHORTCUT_COMMANDS: readonly ShortcutCommandDefinition[] = [
-  { id: 'delete-mark', label: '削除マーク', defaultBinding: 'Mod-Shift-D' },
-  { id: 'comment', label: 'コメント', defaultBinding: 'Mod-Shift-C' },
+  { id: 'delete-mark', labelKey: 'shortcut.deleteMark', defaultBinding: 'Mod-Shift-D' },
+  { id: 'comment', labelKey: 'shortcut.comment', defaultBinding: 'Mod-Shift-C' },
   /**
    * plan15 M1 修正: remove-marks は後方互換シムとして残すが defaultBinding を ''（未割り当て）に変更。
    * Mod-Shift-X は remove-deletion と remove-comment が担う（下記）。
@@ -34,21 +35,26 @@ export const SHORTCUT_COMMANDS: readonly ShortcutCommandDefinition[] = [
    * 返す前の fallback として残す。
    * @deprecated plan16 で remove-deletion / remove-comment に完全移行後に削除予定。
    */
-  { id: 'remove-marks', label: 'マーク解除（後方互換シム）', defaultBinding: '' },
+  { id: 'remove-marks', labelKey: 'shortcut.removeMarksCompat', defaultBinding: '' },
   /** plan15 C-2: 削除マーク解除専用（Mod-Shift-X） */
-  { id: 'remove-deletion', label: '削除解除', defaultBinding: 'Mod-Shift-X' },
+  { id: 'remove-deletion', labelKey: 'shortcut.removeDeletion', defaultBinding: 'Mod-Shift-X' },
   /** plan15 C-2: コメント削除専用（Mod-Shift-X） */
-  { id: 'remove-comment', label: 'コメント削除', defaultBinding: 'Mod-Shift-X' },
-  { id: 'format-heading-1', label: '見出し H1', defaultBinding: 'Mod-Alt-1' },
-  { id: 'format-heading-2', label: '見出し H2', defaultBinding: 'Mod-Alt-2' },
-  { id: 'format-heading-3', label: '見出し H3', defaultBinding: 'Mod-Alt-3' },
-  { id: 'format-bold', label: '太字', defaultBinding: 'Mod-B' },
-  { id: 'format-bullet-list', label: '箇条書き', defaultBinding: 'Mod-Shift-8' },
-  { id: 'save', label: '保存', defaultBinding: 'Mod-S' },
-  { id: 'toggle-view', label: '表示切替', defaultBinding: 'Mod-E' },
-  { id: 'undo', label: '取り消す', defaultBinding: 'Mod-Z' },
-  { id: 'redo', label: 'やり直す', defaultBinding: 'Mod-Shift-Z' },
+  { id: 'remove-comment', labelKey: 'shortcut.removeComment', defaultBinding: 'Mod-Shift-X' },
+  { id: 'format-heading-1', labelKey: 'shortcut.heading1', defaultBinding: 'Mod-Alt-1' },
+  { id: 'format-heading-2', labelKey: 'shortcut.heading2', defaultBinding: 'Mod-Alt-2' },
+  { id: 'format-heading-3', labelKey: 'shortcut.heading3', defaultBinding: 'Mod-Alt-3' },
+  { id: 'format-bold', labelKey: 'shortcut.bold', defaultBinding: 'Mod-B' },
+  { id: 'format-bullet-list', labelKey: 'shortcut.bulletList', defaultBinding: 'Mod-Shift-8' },
+  { id: 'save', labelKey: 'shortcut.save', defaultBinding: 'Mod-S' },
+  { id: 'toggle-view', labelKey: 'shortcut.toggleView', defaultBinding: 'Mod-E' },
+  { id: 'undo', labelKey: 'shortcut.undo', defaultBinding: 'Mod-Z' },
+  { id: 'redo', labelKey: 'shortcut.redo', defaultBinding: 'Mod-Shift-Z' },
 ] as const;
+
+export function shortcutCommandLabel(id: ShortcutCommandId): string {
+  const command = SHORTCUT_COMMANDS.find((item) => item.id === id);
+  return command ? t(command.labelKey) : id;
+}
 
 export const DEFAULT_SHORTCUT_BINDINGS = Object.fromEntries(
   SHORTCUT_COMMANDS.map((command) => [command.id, command.defaultBinding]),
@@ -119,20 +125,19 @@ export function validateShortcutCandidate(
   bindings: ShortcutBindings,
   commandId: ShortcutCommandId,
 ): { ok: true } | { ok: false; message: string } {
-  if (!binding) return { ok: false, message: 'このキーは割り当てられません。' };
+  if (!binding) return { ok: false, message: t('shortcut.invalidKey') };
   if (RESERVED_BINDINGS.has(binding)) {
-    return { ok: false, message: 'macOS の予約ショートカットは割り当てられません。' };
+    return { ok: false, message: t('shortcut.reservedMac') };
   }
   if ((binding.includes('Mod') || binding.includes('Ctrl')) && binding.endsWith('-Space')) {
-    return { ok: false, message: 'OS の入力切替に使われるキーは割り当てられません。' };
+    return { ok: false, message: t('shortcut.osInputSwitch') };
   }
   if (isUnmodifiedPrintable(binding)) {
-    return { ok: false, message: '文字入力だけのキーは割り当てられません。' };
+    return { ok: false, message: t('shortcut.printableOnly') };
   }
   const duplicate = commandIdForBinding(bindings, binding);
   if (duplicate && duplicate !== commandId) {
-    const label = SHORTCUT_COMMANDS.find((command) => command.id === duplicate)?.label ?? duplicate;
-    return { ok: false, message: `「${label}」と重複しています。` };
+    return { ok: false, message: t('shortcut.duplicate', { label: shortcutCommandLabel(duplicate) }) };
   }
   return { ok: true };
 }

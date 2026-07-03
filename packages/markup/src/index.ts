@@ -5,7 +5,7 @@ export { serializeCritic } from './serialize.js';
 export { acceptView, rejectView } from './views.js';
 export { normalizeNodes } from './normalize.js';
 export { IntegrityError, reconcile } from './reconcile.js';
-export { buildCriticMarkupReadingGuide, buildSummary, countChanges } from './summary.js';
+export { buildCriticMarkupReadingGuide, countChanges } from './summary.js';
 export type { ChangeCounts, ReadingGuideOptions, SummaryOptions } from './summary.js';
 export { assembleReviewFile } from './assemble.js';
 export type { AssembleInput } from './assemble.js';

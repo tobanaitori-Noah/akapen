@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 interface BrowseEntry {
   name: string;
   type: 'file' | 'dir';
@@ -195,6 +197,22 @@ function joinPath(dir: string, name: string): string {
   return `${dir.replace(/\/$/, '')}/${name.replace(/^\//, '')}`;
 }
 
+export function resolvePickerInputPath(input: string, currentDir: string): string | null {
+  const value = input.trim();
+  if (!value) return null;
+  if (value.startsWith('/')) return value;
+  return joinPath(currentDir || '/', value);
+}
+
+function parentPathFor(filePath: string): string {
+  const parent = filePath.split('/').slice(0, -1).join('/');
+  return parent || '/';
+}
+
+function basenameFor(filePath: string): string {
+  return filePath.split('/').filter(Boolean).pop() ?? '';
+}
+
 // ---------------------------------------------------------------------------
 // Breadcrumb
 // ---------------------------------------------------------------------------
@@ -349,7 +367,7 @@ function renderList(
   if (visible.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'fp-empty';
-    empty.textContent = opts.showFiles ? '.md ファイルが見つかりません' : 'フォルダなし';
+    empty.textContent = opts.showFiles ? t('filePicker.noMarkdown') : t('filePicker.noFolder');
     container.appendChild(empty);
     return;
   }
@@ -398,7 +416,7 @@ export function showFilePicker(): Promise<string | null> {
     // title bar
     const titlebar = document.createElement('div');
     titlebar.className = 'fp-titlebar';
-    titlebar.textContent = 'ファイルを開く';
+    titlebar.textContent = t('filePicker.openTitle');
 
     // nav bar
     const navbar = document.createElement('div');
@@ -427,17 +445,19 @@ export function showFilePicker(): Promise<string | null> {
     footer.className = 'fp-footer';
     const fnLabel = document.createElement('span');
     fnLabel.className = 'fp-footer-label';
-    fnLabel.textContent = 'ファイル名:';
-    const fnDisplay = document.createElement('div');
-    fnDisplay.className = 'fp-footer-filename';
-    fnDisplay.textContent = '';
+    fnLabel.textContent = t('filePicker.filename');
+    const fnInput = document.createElement('input');
+    fnInput.type = 'text';
+    fnInput.className = 'fp-footer-filename';
+    fnInput.value = '';
+    fnInput.ariaLabel = t('filePicker.filename');
     const spacer = document.createElement('div');
     spacer.style.flex = '1';
     const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button'; cancelBtn.className = 'fp-btn'; cancelBtn.textContent = 'キャンセル';
+    cancelBtn.type = 'button'; cancelBtn.className = 'fp-btn'; cancelBtn.textContent = t('filePicker.cancel');
     const openBtn = document.createElement('button');
-    openBtn.type = 'button'; openBtn.className = 'fp-btn-primary'; openBtn.textContent = '開く'; openBtn.disabled = true;
-    footer.append(fnLabel, fnDisplay, spacer, cancelBtn, openBtn);
+    openBtn.type = 'button'; openBtn.className = 'fp-btn-primary'; openBtn.textContent = t('filePicker.open'); openBtn.disabled = true;
+    footer.append(fnLabel, fnInput, spacer, cancelBtn, openBtn);
 
     dialog.append(style, titlebar, navbar, body, footer);
 
@@ -456,10 +476,20 @@ export function showFilePicker(): Promise<string | null> {
       upBtn.disabled = !parentDir;
     };
 
+    const clearInputError = (): void => {
+      fnInput.setCustomValidity('');
+    };
+
+    const showInputError = (message?: string): void => {
+      fnInput.setCustomValidity(message || t('filePicker.noMarkdown'));
+      fnInput.reportValidity();
+    };
+
     const loadDir = async (dir: string) => {
       selectedFile = null;
       openBtn.disabled = true;
-      fnDisplay.textContent = '';
+      fnInput.value = '';
+      clearInputError();
 
       const data = await browse(dir);
       if (data.status === 'error') return;
@@ -475,11 +505,51 @@ export function showFilePicker(): Promise<string | null> {
         onSelectFile: (p) => {
           selectedFile = p;
           openBtn.disabled = false;
-          fnDisplay.textContent = p.split('/').pop() ?? '';
+          fnInput.value = basenameFor(p);
+          clearInputError();
         },
         onDoubleClickFile: (p) => { dialog.close(); resolve(p); },
         showFiles: true,
       });
+    };
+
+    const openInputPath = async (): Promise<void> => {
+      clearInputError();
+      if (selectedFile && fnInput.value.trim() === basenameFor(selectedFile)) {
+        dialog.close();
+        resolve(selectedFile);
+        return;
+      }
+
+      const candidate = resolvePickerInputPath(fnInput.value, currentDir);
+      if (!candidate) return;
+
+      const dirData = await browse(candidate);
+      if (dirData.status !== 'error') {
+        await navigateTo(dirData.cwd, true);
+        return;
+      }
+
+      const parent = parentPathFor(candidate);
+      const name = basenameFor(candidate);
+      const parentData = await browse(parent);
+      if (parentData.status === 'error') {
+        showInputError(parentData.message);
+        return;
+      }
+
+      const matched = parentData.entries.find((entry) => entry.name === name || entry.path === candidate);
+      if (!matched) {
+        showInputError(dirData.message);
+        return;
+      }
+      if (matched.type === 'dir') {
+        await navigateTo(matched.path, true);
+        return;
+      }
+
+      dialog.close();
+      resolve(matched.path);
     };
 
     const navigateTo = async (dir: string, pushHistory: boolean) => {
@@ -498,7 +568,20 @@ export function showFilePicker(): Promise<string | null> {
       if (historyIdx < history.length - 1) { historyIdx++; void loadDir(history[historyIdx]).then(updateNav); }
     });
     upBtn.addEventListener('click', () => { if (parentDir) void navigateTo(parentDir, true); });
-    openBtn.addEventListener('click', () => { if (selectedFile) { dialog.close(); resolve(selectedFile); } });
+    fnInput.addEventListener('input', () => {
+      selectedFile = null;
+      clearInputError();
+      openBtn.disabled = fnInput.value.trim().length === 0;
+      listEl.querySelectorAll('.fp-row.selected').forEach((row) => row.classList.remove('selected'));
+    });
+    fnInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      void openInputPath();
+    });
+    openBtn.addEventListener('click', () => {
+      void openInputPath();
+    });
     cancelBtn.addEventListener('click', () => { dialog.close(); resolve(null); });
     dialog.addEventListener('cancel', () => resolve(null), { once: true });
     dialog.addEventListener('close', () => dialog.remove(), { once: true });
@@ -530,7 +613,7 @@ export function showSaveLocationPicker(basePath?: string | null): Promise<string
     // title bar
     const titlebar = document.createElement('div');
     titlebar.className = 'fp-titlebar';
-    titlebar.textContent = '名前をつけて保存';
+    titlebar.textContent = t('filePicker.saveTitle');
 
     // nav bar
     const navbar = document.createElement('div');
@@ -555,17 +638,17 @@ export function showSaveLocationPicker(basePath?: string | null): Promise<string
     footer.className = 'fp-footer';
     const fnLabel = document.createElement('span');
     fnLabel.className = 'fp-footer-label';
-    fnLabel.textContent = 'ファイル名:';
+    fnLabel.textContent = t('filePicker.filename');
     const input = document.createElement('input');
     input.className = 'fp-footer-filename';
     input.value = defaultReviewName(basePath);
-    input.ariaLabel = '保存ファイル名';
+    input.ariaLabel = t('filePicker.saveFilename');
     const spacer = document.createElement('div');
     spacer.style.flex = '1';
     const cancelBtn = document.createElement('button');
-    cancelBtn.type = 'button'; cancelBtn.className = 'fp-btn'; cancelBtn.textContent = 'キャンセル';
+    cancelBtn.type = 'button'; cancelBtn.className = 'fp-btn'; cancelBtn.textContent = t('filePicker.cancel');
     const saveBtn = document.createElement('button');
-    saveBtn.type = 'button'; saveBtn.className = 'fp-btn-primary'; saveBtn.textContent = '保存';
+    saveBtn.type = 'button'; saveBtn.className = 'fp-btn-primary'; saveBtn.textContent = t('filePicker.save');
     footer.append(fnLabel, input, spacer, cancelBtn, saveBtn);
 
     dialog.append(style, titlebar, navbar, body, footer);

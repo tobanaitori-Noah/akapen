@@ -11,5 +11,5 @@
     "resolveJsonModule": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src"]
+  "include": ["src", "tests", "e2e/harness"]
 }

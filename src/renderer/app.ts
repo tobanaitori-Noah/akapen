@@ -30,7 +30,7 @@ import type { Extension } from "@codemirror/state";
 import { Prec } from "@codemirror/state";
 import { EditorView as CmEditorView, keymap } from "@codemirror/view";
 import { editorViewCtx } from "@milkdown/kit/core";
-import type { AkapenBridge, AutosaveEntry, BaseStat } from "./bridge";
+import type { AkapenBridge, AkapenLanguage, AkapenTheme, AutosaveEntry, BaseStat } from "./bridge";
 import type { SourceEditorHandle } from "./editor/codemirror";
 import { createSourceEditor } from "./editor/codemirror";
 import { applySourceDeletion } from "./editor/source-redpen";
@@ -55,6 +55,16 @@ import { createWysiwygEditor } from "./editor/milkdown";
 import { hasCriticDelimiter } from "./editor/gesture";
 import { setInsertionOnTypeLoading } from "./editor/insertion-on-type";
 import { buildReviewContent, localReviewDate } from "./export";
+import {
+  DEFAULT_EXPORT_SETTINGS,
+  loadExportSettings,
+  normalizeExportSettings,
+  type ExportSettings,
+} from "./ui/export-settings";
+import {
+  attachExportSettingsToSettingsPanel,
+  createExportSettingsDialog,
+} from "./ui/export-settings-dialog";
 import { refreshDerived } from "./state";
 import type { AppState, ViewMode } from "./state";
 import { createBanners } from "./ui/banners";
@@ -65,7 +75,7 @@ import {
 } from "./editor/source-comment-decoration";
 import { createMarginNotes } from "./ui/margin-notes";
 import { createPaneSync } from "./ui/pane-sync";
-import { createCompletionPanel } from "./ui/panels";
+import { createCompletionPanel, createDropOverlay } from "./ui/panels";
 import { createSelectionPopover } from "./ui/popover";
 import {
   createShortcutSettingsPanel,
@@ -74,6 +84,20 @@ import {
   FONT_SIZE_MIN,
   FONT_SIZE_STEP,
 } from "./ui/shortcuts-panel";
+import { createThemeController, normalizeThemePreference } from "./ui/theme";
+import { createTabBar } from "./ui/tab-bar";
+import {
+  attachTemplateManagerToSettingsPanel,
+  createTemplateManager,
+} from "./ui/template-manager";
+import {
+  activeTab as findActiveTab,
+  buildRestoreEntry,
+  ensureCanAddTab as ensureTabAllowed,
+  moveTabInList,
+  toTabBarItems,
+} from "./ui/tab-state";
+import type { TabSession } from "./ui/tab-state";
 import { createToolbar } from "./ui/toolbar";
 import { createTocPanel } from "./ui/toc-panel";
 import { createAlignmentExtension } from "./editor/alignment";
@@ -88,6 +112,7 @@ import {
   SHORTCUT_COMMANDS,
 } from "./shortcuts";
 import type { ShortcutBindings, ShortcutCommandId } from "./shortcuts";
+import { onLanguageChange, setLanguage, t } from "./i18n";
 import "./ui/styles.css";
 import { canonicalizeBrLines } from "./editor/md-canonicalize";
 import {
@@ -154,6 +179,7 @@ export interface AppHandle {
 }
 
 const baseNameOf = (p: string): string => p.split("/").pop() ?? p;
+const MARKDOWN_FILE_EXT = /\.(md|markdown)$/i;
 
 export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   // plan19 Phase 4.5: insertion-on-type の handlePaste から bridge.showError を呼ぶための
@@ -183,6 +209,10 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   let baseSource: SourceEditorHandle | null = null;
   let workingSource: SourceEditorHandle | null = null;
   let shortcutBindings: ShortcutBindings = { ...DEFAULT_SHORTCUT_BINDINGS };
+  let tabSeq = 0;
+  const tabs: TabSession[] = [];
+  let activeTabId: string | null = null;
+  let tabBar: ReturnType<typeof createTabBar> | null = null;
   // Phase 7.5: 読込みフロー中の subscribe 二重発火を抑止するフラグ（後段の自動保存と共有）。
   // 旧位置は autosave セクション内（変数宣言だけ前出し・初期化は後段で行わず let 宣言だけ）。
   let loadingEditors = false; // 読込みフロー中の編集コールバックを autosave に流さない
@@ -442,6 +472,229 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     };
   }
 
+  function onPreviewDocEdited(): void {
+    if (state.viewMode !== "preview" || loadingEditors) return;
+    if (!sourceRoundTripInProgress) syncOrMergeAnnotationsFromPm();
+    onEdited();
+    popover.refresh();
+    refreshOutline();
+    paneSync.refreshDebounced();
+    refreshUndoRedoState();
+  }
+
+  const activeTab = (): TabSession | null => findActiveTab(tabs, activeTabId);
+  const currentWorkingMarkdown = (): string | null =>
+    workingWysiwyg ? canonicalizeBrLines(workingWysiwyg.getMarkdown()) : state.derivedMd;
+  const renderTabs = (): void => tabBar?.render(toTabBarItems(tabs), activeTabId);
+  const notifyPremiumRequired = (): void =>
+    void window.dispatchEvent(new CustomEvent("akapen:premium-required", { detail: { feature: "tabs" } }));
+  const ensureCanAddTab = (path: string | null): Promise<boolean> =>
+    ensureTabAllowed({ tabs, path, bridge, notifyPremiumRequired });
+  const syncActiveFile = (path: string | null): void => {
+    if (!bridge.setActiveFile) return;
+    void bridge.setActiveFile(path).catch((error) => console.warn("[akapen] active file sync failed", error));
+  };
+  const syncClosedFile = async (path: string): Promise<void> => {
+    if (!bridge.closeFile) return;
+    await bridge.closeFile(path).catch((error) => console.warn("[akapen] close file sync failed", error));
+  };
+  function resetWorkspaceToEmpty(): void {
+    Object.assign(state, { basePath: null, baseOriginal: "", baseStat: null, baseRaw: "", derivedMd: "", globalNote: "", criticHits: [], baseChangedExternally: false });
+    annotationStore.clear();
+    emptyEl.classList.remove("is-hidden");
+    workspaceEl.classList.add("is-hidden");
+    toolbar.setFileLoaded(false);
+    document.title = "AkaPen";
+    autosaveExists = false;
+    autosaveDirty = false;
+  }
+  function currentHasReviewProgress(): boolean {
+    if (state.globalNote.trim().length > 0) return true;
+    if (annotationStore.size > 0) return true;
+    if (workingWysiwyg) {
+      return (
+        comparableSourceProjection(workingWysiwyg.getMarkdown()) !==
+        comparableSourceProjection(state.baseOriginal)
+      );
+    }
+    return false;
+  }
+
+  const buildCurrentRestoreEntry = (): AutosaveEntry | null =>
+    buildRestoreEntry(state, annotationStore.snapshot());
+  function commitSourceBeforeTabChange(): boolean {
+    if (state.viewMode !== "source") return true;
+    try {
+      sourceRoundTripInProgress = true;
+      commitSourceEditsFromEditor();
+      return true;
+    } catch (error) {
+      resetSourceEditorToProjectionOnFailure();
+      void bridge.showError({
+        message: t("app.sourcePreviewFailedTitle"),
+        detail: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    } finally {
+      sourceRoundTripInProgress = false;
+    }
+  }
+  function snapshotActiveTab(): boolean {
+    const tab = activeTab();
+    if (!tab || !state.basePath) return true;
+    if (!commitSourceBeforeTabChange()) return false;
+    if (workingWysiwyg && state.viewMode === "preview") {
+      syncOrMergeAnnotationsFromPm();
+    }
+    tab.payload = { path: state.basePath, content: state.baseOriginal, stat: state.baseStat! };
+    tab.restore = buildCurrentRestoreEntry();
+    tab.workingMarkdown = currentWorkingMarkdown();
+    tab.viewMode = state.viewMode;
+    tab.entryExists = autosaveExists;
+    tab.autosaveDirty = autosaveDirty;
+    tab.baseChangedExternally = state.baseChangedExternally;
+    tab.dirty = tab.dirty || autosaveDirty;
+    renderTabs();
+    return true;
+  }
+  function addTabFromCurrent(): void {
+    if (!state.basePath || !state.baseStat) return;
+    const tab: TabSession = {
+      id: `tab-${++tabSeq}`,
+      payload: { path: state.basePath, content: state.baseOriginal, stat: state.baseStat },
+      title: baseNameOf(state.basePath),
+      restore: buildCurrentRestoreEntry(),
+      workingMarkdown: currentWorkingMarkdown(),
+      viewMode: state.viewMode,
+      entryExists: autosaveExists,
+      autosaveDirty,
+      dirty: currentHasReviewProgress(),
+      baseChangedExternally: state.baseChangedExternally,
+    };
+    tabs.push(tab);
+    activeTabId = tab.id;
+    renderTabs();
+    syncActiveFile(state.basePath);
+  }
+  async function mountIntoActiveTab(payload: OpenFilePayload, restore: AutosaveEntry | null, options: { rebase?: boolean; entryExists: boolean }): Promise<void> {
+    const replacing = activeTab();
+    const previousPath = replacing?.payload?.path ?? null;
+    await mountEditors(payload, restore, options);
+    if (replacing) {
+      Object.assign(replacing, {
+        payload: { path: state.basePath!, content: state.baseOriginal, stat: state.baseStat! },
+        title: baseNameOf(state.basePath!),
+        restore: buildCurrentRestoreEntry(),
+        workingMarkdown: currentWorkingMarkdown(),
+        viewMode: state.viewMode,
+        entryExists: autosaveExists,
+        autosaveDirty,
+        dirty: currentHasReviewProgress(),
+        baseChangedExternally: state.baseChangedExternally,
+      });
+      renderTabs();
+      if (previousPath && previousPath !== state.basePath) void syncClosedFile(previousPath);
+      syncActiveFile(state.basePath);
+    } else {
+      addTabFromCurrent();
+    }
+  }
+  async function activateTab(id: string): Promise<void> {
+    if (id === activeTabId) return;
+    const tab = tabs.find((item) => item.id === id);
+    if (!tab) return;
+    const previousTab = activeTab();
+    if (!snapshotActiveTab()) return;
+    fileSwitchToken += 1;
+    await flushAutosave();
+    if (previousTab) {
+      previousTab.autosaveDirty = false;
+      previousTab.entryExists = autosaveExists;
+    }
+    if (!tab.payload) {
+      pulseWorkspaceTransition("is-tab-switching");
+      await destroyEditors();
+      resetWorkspaceToEmpty();
+      activeTabId = tab.id;
+      renderTabs();
+      syncActiveFile(null);
+      return;
+    }
+    pulseWorkspaceTransition("is-tab-switching");
+    await mountEditors(tab.payload, tab.restore, {
+      entryExists: tab.entryExists,
+      workingMarkdown: tab.workingMarkdown,
+      restoreViewMode: tab.viewMode,
+      autosaveDirty: tab.autosaveDirty,
+    });
+    state.baseChangedExternally = tab.baseChangedExternally;
+    if (tab.baseChangedExternally) banners.showBaseChanged();
+    activeTabId = tab.id;
+    renderTabs();
+    syncActiveFile(tab.payload.path);
+  }
+  async function resetAfterLastTab(): Promise<void> {
+    await destroyEditors();
+    resetWorkspaceToEmpty();
+    renderTabs();
+    syncActiveFile(null);
+  }
+  async function addEmptyTab(): Promise<void> {
+    if (!(await ensureCanAddTab(null))) return;
+    const previousTab = activeTab();
+    if (!snapshotActiveTab()) return;
+    fileSwitchToken += 1;
+    await flushAutosave();
+    if (previousTab) Object.assign(previousTab, { autosaveDirty: false, entryExists: autosaveExists });
+    const tab: TabSession = {
+      id: `tab-${++tabSeq}`,
+      payload: null,
+      title: t("tabs.newTab"),
+      restore: null,
+      workingMarkdown: null,
+      viewMode: "preview",
+      entryExists: false,
+      autosaveDirty: false,
+      dirty: false,
+      baseChangedExternally: false,
+    };
+    tabs.push(tab);
+    activeTabId = tab.id;
+    await destroyEditors();
+    resetWorkspaceToEmpty();
+    renderTabs();
+    syncActiveFile(null);
+  }
+  async function closeTab(id: string): Promise<void> {
+    const index = tabs.findIndex((tab) => tab.id === id);
+    if (index === -1) return;
+    const tab = tabs[index];
+    if (id === activeTabId && !snapshotActiveTab()) return;
+    if (tab.dirty) {
+      const ok = await bridge.confirm({
+        message: t("tabs.closeDirtyTitle"),
+        detail: t("tabs.closeDirtyDetail", { name: tab.title }),
+      });
+      if (!ok) return;
+    }
+    tabs.splice(index, 1);
+    if (tab.payload) await syncClosedFile(tab.payload.path);
+    if (id !== activeTabId) {
+      renderTabs();
+      return;
+    }
+    const next = tabs[Math.min(index, tabs.length - 1)] ?? null;
+    activeTabId = null;
+    if (!next) {
+      await resetAfterLastTab();
+      return;
+    }
+    await activateTab(next.id);
+  }
+  function moveTab(sourceId: string, targetId: string): void {
+    if (moveTabInList(tabs, sourceId, targetId)) renderTabs();
+  }
+
   // plan19 Phase 5 HIGH-4 対処（B5 SFH 沈黙故障）:
   //   ファイル切替を識別するトークン。`onOpenFile` 経路で「現ファイル → 別ファイル」の
   //   切替が確定する直前にインクリメントする。`handleHeadingCrossedDialog` は開始時に
@@ -484,18 +737,16 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     try {
       if (trim.kind === "single") {
         const ok = await bridge.confirm({
-          message: "見出しを除いた本文だけにコメントしますか？",
-          detail:
-            "選択範囲に見出し行が含まれていたため、本文部分のみを対象にします。",
+          message: t("app.commentHeadingConfirmTitle"),
+          detail: t("app.commentHeadingConfirmDetail"),
         });
         if (!ok) return;
         // ファイル切替が走っていたら onAcceptSingle は古い workingWysiwyg を指す＝
         // 新ファイルに誤った範囲でコメントを書く沈黙故障。明示通知して中断する。
         if (snapWysiwyg !== workingWysiwyg || snapToken !== fileSwitchToken) {
           void bridge.showError({
-            message: "コメントを追加できませんでした",
-            detail:
-              "確認ダイアログ表示中に別のファイルが開かれたため、操作を中断しました。もう一度コメントを付け直してください。",
+            message: t("app.commentRaceTitle"),
+            detail: t("app.commentRaceDetail"),
           });
           return;
         }
@@ -504,17 +755,15 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       }
       if (trim.kind === "multiple") {
         await bridge.confirm({
-          message: "本文範囲が複数に分かれるためキャンセルします。",
-          detail:
-            "選択範囲に中間の見出し行が含まれており、コメント対象を 1 箇所に絞れません。範囲を選び直してください。",
+          message: t("app.commentMultipleTitle"),
+          detail: t("app.commentMultipleDetail"),
         });
         return;
       }
       // empty
       await bridge.confirm({
-        message: "コメント対象の本文が残っていません。",
-        detail:
-          "選択範囲が見出し行だけで構成されているため、コメントを付けられません。",
+        message: t("app.commentEmptyTitle"),
+        detail: t("app.commentEmptyDetail"),
       });
     } finally {
       openDialogCount = Math.max(0, openDialogCount - 1);
@@ -544,7 +793,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       console.error("[akapen] handleHeadingCrossedDialog rejected", error);
       const detail = error instanceof Error ? error.message : String(error);
       void bridge.showError({
-        message: "見出しまたぎの確認に失敗しました",
+        message: t("app.headingDialogFailedTitle"),
         detail,
       });
     });
@@ -552,8 +801,12 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
 
   // K7: 文字サイズ（%）の現在値。setZoom で一元管理
   let currentFontSize: number = FONT_SIZE_DEFAULT;
-  // K7: writeSettings の連続失敗カウンタ（沈黙故障の検知用）
-  let fontSizePersistFailures = 0;
+  let currentTheme: AkapenTheme = "light";
+  let currentLanguage: AkapenLanguage = "ja";
+  let currentExportSettings: ExportSettings = normalizeExportSettings(DEFAULT_EXPORT_SETTINGS);
+  const themeController = createThemeController({ initialTheme: currentTheme });
+  // K7/12.6: writeSettings の連続失敗カウンタ（沈黙故障の検知用）
+  let settingsPersistFailures = 0;
 
   /**
    * K7: 文字サイズの画面反映だけを行う内部ヘルパ（永続化なし）。
@@ -584,24 +837,61 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     return clamped;
   }
 
-  /** K7: 文字サイズを即反映・永続化・パネル表示を同期する（スライダー/メニュー/手入力の合流点） */
-  async function setZoom(pct: number): Promise<void> {
-    const clamped = applyZoomState(pct);
+  async function persistAppSettings(source: "font-size" | "theme" | "language"): Promise<void> {
     try {
-      await bridge.writeSettings({ version: 1, fontSize: clamped });
-      fontSizePersistFailures = 0;
+      await bridge.writeSettings({
+        version: 1,
+        fontSize: currentFontSize,
+        theme: currentTheme,
+        language: currentLanguage,
+      });
+      settingsPersistFailures = 0;
     } catch (error) {
       // 単発失敗はコンソールのみ（バナー過剰回避）。連続3回でログレベルを上げて気づける状態にする。
-      fontSizePersistFailures += 1;
-      if (fontSizePersistFailures >= 3) {
+      settingsPersistFailures += 1;
+      if (settingsPersistFailures >= 3) {
         console.error(
-          "[akapen] font-size persist failed (3+ times in a row)",
+          `[akapen] ${source} setting persist failed (3+ times in a row)`,
           error,
         );
       } else {
-        console.warn("[akapen] font-size persist failed", error);
+        console.warn(`[akapen] ${source} setting persist failed`, error);
       }
     }
+  }
+
+  /** K7: 文字サイズを即反映・永続化・パネル表示を同期する（スライダー/メニュー/手入力の合流点） */
+  async function setZoom(pct: number): Promise<void> {
+    applyZoomState(pct);
+    await persistAppSettings("font-size");
+  }
+
+  function applyThemeState(theme: AkapenTheme | undefined): AkapenTheme {
+    const normalized = normalizeThemePreference(theme);
+    currentTheme = themeController.setTheme(normalized);
+    if (typeof shortcutPanel !== "undefined") {
+      shortcutPanel.setTheme(currentTheme);
+    }
+    return currentTheme;
+  }
+
+  async function setThemePreference(theme: AkapenTheme): Promise<void> {
+    applyThemeState(theme);
+    await persistAppSettings("theme");
+  }
+
+  function applyLanguageState(language: AkapenLanguage): AkapenLanguage {
+    currentLanguage = language;
+    setLanguage(language);
+    if (typeof shortcutPanel !== "undefined") {
+      shortcutPanel.setLanguage(language);
+    }
+    return currentLanguage;
+  }
+
+  async function setLanguagePreference(language: AkapenLanguage): Promise<void> {
+    applyLanguageState(language);
+    await persistAppSettings("language");
   }
 
   /**
@@ -687,6 +977,11 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   /** operations / globalNote が変わった時に呼ぶ（autosave のスケジューリング） */
   function onEdited(): void {
     if (loadingEditors || !state.basePath) return;
+    const tab = activeTab();
+    if (tab) {
+      tab.dirty = true;
+      renderTabs();
+    }
     autosaveDirty = true;
     if (!autosaveExists) {
       void writeAutosaveNow(); // 初回編集は即時保存（失敗は内部でバナー表示＝reject しない）
@@ -713,26 +1008,42 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   }
 
   // --- DOM 骨格（空状態⇄編集状態） ---
+  const shouldPlayWelcomeIntro = (() => {
+    try {
+      const key = "akapen:welcome-intro-seen";
+      const seen = window.sessionStorage.getItem(key) === "1";
+      if (!seen) window.sessionStorage.setItem(key, "1");
+      return !seen;
+    } catch {
+      return false;
+    }
+  })();
   const appEl = document.createElement("div");
   appEl.className = "akapen-app";
   appEl.innerHTML = `
     <main class="akapen-main">
-      <section class="akapen-empty">
-        <p>レビューする .md ファイルを開いてください。</p>
-        <button type="button" data-action="empty-open">ファイルを開く</button>
-        <div data-role="resume-list"></div>
+      <section class="akapen-empty ${shouldPlayWelcomeIntro ? "akapen-empty--intro" : ""}" data-role="welcome-screen">
+        <div class="akapen-empty__brand" aria-label="AkaPen">
+          <div class="akapen-empty__logo-wrap">
+            <img class="akapen-empty__logo-img" src="./akapen-logo.png" alt="AkaPen" draggable="false" />
+          </div>
+          <p class="akapen-empty__tagline" data-role="empty-tagline">${t('app.emptyTagline')}</p>
+        </div>
+        <p class="akapen-empty__prompt" data-role="empty-prompt">${t('app.emptyPrompt')}</p>
+        <button type="button" class="akapen-empty__open" data-action="empty-open">${t('app.openFile')}</button>
+        <div class="akapen-empty__resume" data-role="resume-list"></div>
       </section>
       <section class="akapen-workspace is-hidden">
         <div class="akapen-pane akapen-pane--base">
-          <div class="akapen-pane-title akapen-pane-title--base">🔒元データ（読み取り専用）</div>
+          <div class="akapen-pane-title akapen-pane-title--base" data-role="base-pane-title">${t('app.basePaneTitle')}</div>
           <div class="akapen-pane-body">
             <div class="akapen-editor" data-editor="base-preview"></div>
             <div class="akapen-editor is-hidden" data-editor="base-source"></div>
           </div>
         </div>
-        <div class="akapen-divider" data-role="pane-divider" role="separator" aria-orientation="vertical" aria-label="左右ペインの境界"></div>
+        <div class="akapen-divider" data-role="pane-divider" role="separator" aria-orientation="vertical" aria-label="${t('app.paneDivider')}"></div>
         <div class="akapen-pane akapen-pane--working">
-          <div class="akapen-pane-title akapen-pane-title--working">✎作業エリア</div>
+          <div class="akapen-pane-title akapen-pane-title--working" data-role="working-pane-title">${t('app.workingPaneTitle')}</div>
           <div class="akapen-pane-body">
             <div class="akapen-editor" data-editor="working-preview"></div>
             <div class="akapen-editor is-hidden" data-editor="working-source"></div>
@@ -753,7 +1064,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       window.clearTimeout(statusbarTimer);
       statusbarTimer = null;
     }
-    statusbarEl.textContent = `この記号（${detectedDelimiter}）は使えません`;
+    statusbarEl.textContent = t("app.statusInvalidDelimiter", { delimiter: detectedDelimiter });
     statusbarTimer = window.setTimeout(() => {
       statusbarTimer = null;
       statusbarEl.textContent = "";
@@ -766,7 +1077,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       window.clearTimeout(statusbarTimer);
       statusbarTimer = null;
     }
-    statusbarEl.textContent = "この箇所は編集できません";
+    statusbarEl.textContent = t("app.statusNoop");
     statusbarTimer = window.setTimeout(() => {
       statusbarTimer = null;
       statusbarEl.textContent = "";
@@ -779,7 +1090,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       window.clearTimeout(statusbarTimer);
       statusbarTimer = null;
     }
-    statusbarEl.textContent = "コメント範囲を含む削除はできません";
+    statusbarEl.textContent = t("app.statusCommentDeleteBlocked");
     statusbarTimer = window.setTimeout(() => {
       statusbarTimer = null;
       statusbarEl.textContent = "";
@@ -802,6 +1113,15 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   const workingSourceEl = query<HTMLDivElement>(
     '[data-editor="working-source"]',
   );
+  const renderAppText = (): void => {
+    query<HTMLParagraphElement>('[data-role="empty-tagline"]').textContent = t('app.emptyTagline');
+    query<HTMLParagraphElement>('[data-role="empty-prompt"]').textContent = t('app.emptyPrompt');
+    query<HTMLButtonElement>('[data-action="empty-open"]').textContent = t('app.openFile');
+    query<HTMLDivElement>('[data-role="base-pane-title"]').textContent = t('app.basePaneTitle');
+    query<HTMLDivElement>('[data-role="pane-divider"]').setAttribute('aria-label', t('app.paneDivider'));
+    query<HTMLDivElement>('[data-role="working-pane-title"]').textContent = t('app.workingPaneTitle');
+  };
+  onLanguageChange(renderAppText);
   // plan19 Phase 5.5（TS HIGH-2 対処・2026-06-18）:
   //   旧実装は `parentElement as HTMLElement` で null cast で消していたが、
   //   `parentElement` は `HTMLElement | null`＝レイアウト崩壊時に null になりうる。
@@ -812,6 +1132,43 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   const basePaneBody = basePreviewEl.parentElement;
   if (!basePaneBody)
     throw new Error("app: basePreviewEl has no parent (.akapen-pane-body)");
+  let workspaceTransitionTimer: number | null = null;
+  const pulseWorkspaceTransition = (className: "is-view-switching" | "is-tab-switching"): void => {
+    if (workspaceTransitionTimer !== null) window.clearTimeout(workspaceTransitionTimer);
+    workspaceEl.classList.remove("is-view-switching", "is-tab-switching");
+    workspaceEl.classList.add(className);
+    workspaceTransitionTimer = window.setTimeout(() => {
+      workspaceEl.classList.remove(className);
+      workspaceTransitionTimer = null;
+    }, 180);
+  };
+  const prefersReducedMotion = (): boolean =>
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const waitForMotion = (ms: number): Promise<void> =>
+    prefersReducedMotion()
+      ? Promise.resolve()
+      : new Promise((resolve) => window.setTimeout(resolve, ms));
+  const revealWorkspaceAfterOpen = async (): Promise<void> => {
+    const fromWelcome = !emptyEl.classList.contains("is-hidden");
+    if (fromWelcome) {
+      emptyEl.classList.add("is-leaving");
+      await waitForMotion(150);
+    }
+    emptyEl.classList.add("is-hidden");
+    emptyEl.classList.remove("is-leaving", "akapen-empty--intro");
+    workspaceEl.classList.remove("is-hidden");
+    if (!fromWelcome) return;
+    workspaceEl.classList.add("is-opening");
+    toolbar.element.classList.add("is-enabling");
+    window.setTimeout(
+      () => {
+        workspaceEl.classList.remove("is-opening");
+        toolbar.element.classList.remove("is-enabling");
+      },
+      prefersReducedMotion() ? 0 : 360,
+    );
+  };
 
   // G5: 行整列エクステンション（base/working の両ペイン用）
   const alignmentExt = createAlignmentExtension();
@@ -867,6 +1224,19 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     },
   });
   appEl.prepend(toolbar.element);
+  tabBar = createTabBar({
+    onAdd: () => {
+      void addEmptyTab();
+    },
+    onSelect: (id) => {
+      void activateTab(id);
+    },
+    onClose: (id) => {
+      void closeTab(id);
+    },
+    onMove: moveTab,
+  });
+  statusbarEl.before(tabBar.element);
   const shortcutPanel = createShortcutSettingsPanel({
     commands: SHORTCUT_COMMANDS,
     bindings: shortcutBindings,
@@ -877,13 +1247,37 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       void setZoom(pct);
     },
     initialFontSize: currentFontSize,
+    onThemeChange: (theme) => {
+      void setThemePreference(theme);
+    },
+    initialTheme: currentTheme,
+    onLanguageChange: (language) => {
+      void setLanguagePreference(language);
+    },
+    initialLanguage: currentLanguage,
   });
   appEl.appendChild(shortcutPanel.element);
+  const templateManager = createTemplateManager();
+  const detachTemplateManagerButton = attachTemplateManagerToSettingsPanel(
+    templateManager,
+    shortcutPanel.element,
+  );
+  const exportSettingsDialog = createExportSettingsDialog({
+    onSaved: (settings) => {
+      currentExportSettings = settings;
+    },
+  });
+  const detachExportSettingsButton = attachExportSettingsToSettingsPanel(
+    exportSettingsDialog,
+    shortcutPanel.element,
+  );
   // バナー（ガード②③）＝ツールバー直下に常設・完了パネルは overlay
   const banners = createBanners();
   toolbar.element.after(banners.element);
   const completionPanel = createCompletionPanel();
   appEl.appendChild(completionPanel.element);
+  const dropOverlay = createDropOverlay();
+  appEl.appendChild(dropOverlay.element);
 
   // G4: TOC パネル（右側からスライドイン）
   const tocPanel = createTocPanel({
@@ -1042,9 +1436,8 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   function guardPreviewFormatting(): boolean {
     if (state.viewMode !== "preview") return false;
     void bridge.showError({
-      message: "整形はコード表示で行ってください",
-      detail:
-        "見出し・太字・箇条書きなどの整形はビュワーでは取り込めません。コード表示に切り替えて編集してください。",
+      message: t("app.formatCodeOnlyTitle"),
+      detail: t("app.formatCodeOnlyDetail"),
     });
     return true;
   }
@@ -1198,8 +1591,10 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         toggleViewMode();
         return true;
       case "undo":
+        if (activeUndoRedoState().canUndo) toolbar.flashUndo();
         return runUndo();
       case "redo":
+        if (activeUndoRedoState().canRedo) toolbar.flashRedo();
         return runRedo();
       default:
         return false;
@@ -1218,6 +1613,46 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     if (isKnownDefaultBinding(binding)) {
       event.preventDefault();
       event.stopPropagation();
+      return true;
+    }
+    return false;
+  }
+
+  function handleTabShortcutKey(event: KeyboardEvent): boolean {
+    const mod = event.metaKey || event.ctrlKey;
+    if (!mod || event.altKey || tabs.length === 0) return false;
+    const key = event.key;
+    if (!event.shiftKey && /^[1-9]$/.test(key)) {
+      const index = Number(key) - 1;
+      const tab = tabs[index];
+      if (!tab) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      void activateTab(tab.id);
+      return true;
+    }
+    if (event.shiftKey && (key === ']' || event.code === 'BracketRight')) {
+      const index = tabs.findIndex((tab) => tab.id === activeTabId);
+      const next = tabs[(index + 1 + tabs.length) % tabs.length];
+      if (!next) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      void activateTab(next.id);
+      return true;
+    }
+    if (event.shiftKey && (key === '[' || event.code === 'BracketLeft')) {
+      const index = tabs.findIndex((tab) => tab.id === activeTabId);
+      const previous = tabs[(index - 1 + tabs.length) % tabs.length];
+      if (!previous) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      void activateTab(previous.id);
+      return true;
+    }
+    if (!event.shiftKey && key.toLowerCase() === 'w' && activeTabId) {
+      event.preventDefault();
+      event.stopPropagation();
+      void closeTab(activeTabId);
       return true;
     }
     return false;
@@ -1254,7 +1689,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     }
     if (result.status === "error") {
       void bridge.showError({
-        message: "ショートカットを保存できませんでした",
+        message: t("app.shortcutSaveFailedTitle"),
         detail: result.message,
       });
       return false;
@@ -1272,7 +1707,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       reconfigureSourceShortcuts();
     } catch (error) {
       void bridge.showError({
-        message: "ショートカット設定を読み込めませんでした",
+        message: t("app.shortcutLoadFailedTitle"),
         detail: error instanceof Error ? error.message : String(error),
       });
     }
@@ -1284,14 +1719,30 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     try {
       const saved = await bridge.readSettings();
       applyZoomState(saved.fontSize);
+      applyThemeState(saved.theme);
+      applyLanguageState(saved.language ?? "ja");
+      if (!saved.languageConfigured) {
+        const choice = await bridge.choose({
+          message: t("language.dialogTitle"),
+          detail: t("language.dialogDetail"),
+          buttons: [t("settings.languageJapanese"), t("settings.languageEnglish")],
+          cancelId: 0,
+        });
+        await setLanguagePreference(choice === 1 ? "en" : "ja");
+      }
     } catch {
       // 読込み失敗は既定値のまま
     }
   })();
 
+  void (async () => {
+    currentExportSettings = await loadExportSettings();
+  })();
+
   const onDocumentShortcutKey = (event: KeyboardEvent): void => {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest(".akapen-shortcuts-panel")) return;
+    if (handleTabShortcutKey(event)) return;
     if (target?.closest(".akapen-editor")) return;
     const binding = normalizeShortcutEvent(event);
     if (!binding) return;
@@ -1595,6 +2046,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     workingPreviewEl.classList.toggle("is-hidden", !preview);
     baseSourceEl.classList.toggle("is-hidden", preview);
     workingSourceEl.classList.toggle("is-hidden", preview);
+    pulseWorkspaceTransition("is-view-switching");
     toolbar.setViewMode(mode);
     popover.refresh();
     marginNotes.setVisible(preview);
@@ -1628,12 +2080,18 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   async function mountEditors(
     payload: OpenFilePayload,
     restore: AutosaveEntry | null,
-    options: { rebase?: boolean; entryExists: boolean },
+    options: {
+      rebase?: boolean;
+      entryExists: boolean;
+      workingMarkdown?: string | null;
+      restoreViewMode?: ViewMode;
+      autosaveDirty?: boolean;
+    },
   ): Promise<void> {
     loadingEditors = true;
     setInsertionOnTypeLoading(true);
     cancelAutosaveTimer();
-    autosaveDirty = false;
+    autosaveDirty = options.autosaveDirty ?? false;
     try {
       await destroyEditors();
       state.basePath = payload.path;
@@ -1653,23 +2111,33 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       // ---- baseRaw を据える ----
       // v5 では PM doc が真実源。baseRaw はファイルの元内容をそのまま保持（critic 記法含む）。
       state.baseRaw = payload.content;
-      previewMarkdownFormattingDirty = false;
+      previewMarkdownFormattingDirty =
+        options.workingMarkdown !== null &&
+        options.workingMarkdown !== undefined &&
+        comparableSourceProjection(options.workingMarkdown) !==
+          comparableSourceProjection(payload.content);
+      sourceProjectionOnEntry = null;
+      sourceUsesCurrentMarkdownProjection = false;
       if (restore && options.rebase) {
-        banners.showWarning(
-          "前回の作業（添削履歴）は載せ替えできなかったため、現行ファイルを新規に開きました（自動保存は残しています）。",
-        );
+        banners.showWarning(t("app.rebaseFailedWarning"));
         state.globalNote = "";
         toolbar.setGlobalNote("");
       }
 
       refreshDerived(state);
+      const restoredAnnotationMd =
+        restore?.annotations && restore.annotations.length > 0
+          ? buildCriticMarkup(payload.content, restore.annotations)
+          : null;
+      const workingDefaultValue =
+        options.workingMarkdown ?? restoredAnnotationMd ?? payload.content;
 
       // ---- エディター実体の生成 ----
       // plan30 Phase 1: 右ペイン WYSIWYG は元ファイル内容を直接表示。
       // Milkdown の critic parser が {--…--} 等を PM marks に変換する。
       workingWysiwyg = await createWysiwygEditor({
         root: workingPreviewEl,
-        defaultValue: payload.content,
+        defaultValue: workingDefaultValue,
         // K3.5 段階1（plan6）: 破壊ジェスチャ→ operations.append（gesture.ts で operationStore へ）。
         gesture: true,
         // K3.5 段階3（plan8）: 整形効果表示は作業ペインの preview だけに乗せる。
@@ -1685,6 +2153,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
           refreshUndoRedoState();
           paneSync.refreshDebounced(); // F2: 編集で右の高さが動く→スペーサー再計算
         },
+        onDocEdited: onPreviewDocEdited,
         // K3.5 段階2（plan7）: 記法文字ガードの通知配線。
         onNotationBlocked: (text) => updateStatusBar(text),
         // M-6（段階5）: 全 noop 上書き時の UI トースト通知。
@@ -1710,7 +2179,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       if (restore?.annotations && restore.annotations.length > 0) {
         annotationStore.restore(restore.annotations);
       }
-      updateDerivedMdFromAnnotations(payload.content);
+      updateDerivedMdFromAnnotations(workingDefaultValue);
 
       // 左ペイン＝ベース（読み取り専用・baseOriginal を表示）
       baseWysiwyg = await createWysiwygEditor({
@@ -1755,10 +2224,10 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       );
 
       document.title = `${baseNameOf(payload.path)} — AkaPen`;
-      emptyEl.classList.add("is-hidden");
-      workspaceEl.classList.remove("is-hidden");
+      await revealWorkspaceAfterOpen();
       toolbar.setFileLoaded(true);
       applyViewMode("preview");
+      if (options.restoreViewMode === "source") toggleViewMode();
       refreshOutline(); // F5: 読込んだ文書から見出し一覧を生成
       autosaveExists = options.entryExists;
     } catch (err) {
@@ -1768,7 +2237,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       workingSource = null;
       state.basePath = null;
       void bridge.showError({
-        message: "ファイルを開く際に予期しないエラーが発生しました",
+        message: t("app.openUnexpectedTitle"),
         detail: err instanceof Error ? err.message : String(err),
       });
       throw err;
@@ -1787,6 +2256,29 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
    *     （スナップショットのまま続行／現行 base に載せ替え／破棄）
    */
   async function openFile(payload: OpenFilePayload): Promise<void> {
+    const duplicate = tabs.find((tab) => tab.payload?.path === payload.path && tab.id !== activeTabId);
+    if (duplicate) {
+      const current = activeTab();
+      if (current?.payload === null) {
+        tabs.splice(tabs.indexOf(current), 1);
+        activeTabId = null;
+        renderTabs();
+      }
+      await activateTab(duplicate.id);
+      return;
+    }
+    const previousTab = activeTab();
+    if (typeof bridge.isPremiumUnlocked === "function") {
+      if (!snapshotActiveTab()) return;
+      fileSwitchToken += 1;
+      await flushAutosave();
+      if (previousTab) Object.assign(previousTab, { autosaveDirty: false, entryExists: autosaveExists });
+    } else if (tabs.length > 0) {
+      tabs.splice(0);
+      activeTabId = null;
+      renderTabs();
+    }
+
     // autosave の read 失敗を無言で吸収しない: ENOENT は main 側で entry:null（=なし）、
     // 破損・その他のエラーは新規開きに落とした上で警告バナーで伝える
     let entry: AutosaveEntry | null = null;
@@ -1814,7 +2306,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     const showPendingIntegrityBanner = (): void => {
       if (pendingRepairReason !== null) {
         banners.showRepairNotice(
-          "保存データを自動で修復して復元しました。",
+          t("app.repairNotice"),
           pendingRepairActions.length > 0
             ? pendingRepairActions
             : [pendingRepairReason],
@@ -1822,7 +2314,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       }
       if (pendingSevereReason !== null) {
         banners.showWarning(
-          `前回の自動保存は失われました（${pendingSevereReason}）。素のファイルから開きます。`,
+          t("app.autosaveLost", { reason: pendingSevereReason }),
         );
       }
     };
@@ -1838,15 +2330,15 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
           entry.baseRaw,
         )
       ) {
-        pendingRepairReason = "ネストした CriticMarkup を除去";
-        pendingRepairActions = ["ネストした CriticMarkup を除去"];
+        pendingRepairReason = t("app.repairNestedCritic");
+        pendingRepairActions = [t("app.repairNestedCritic")];
       }
     }
 
     if (!entry) {
-      await mountEditors(payload, null, { entryExists: false });
+      await mountIntoActiveTab(payload, null, { entryExists: false });
       if (autosaveReadError) {
-        banners.showWarning(`前回の自動保存が読めません: ${autosaveReadError}`);
+        banners.showWarning(t("app.autosaveReadFailed", { message: autosaveReadError }));
       }
       showPendingIntegrityBanner();
       return;
@@ -1866,7 +2358,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         entry.globalNote !== "" ||
         (entry.annotations?.length ?? 0) > 0;
       if (!hasProgress) {
-        await mountEditors(payload, null, { entryExists: true });
+        await mountIntoActiveTab(payload, null, { entryExists: true });
         showPendingIntegrityBanner();
         return;
       }
@@ -1875,12 +2367,12 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       // 「新規で再スタート」（自動保存を使わない）は明示クリックのみ＝黙って失わない。
       // 想定外の返り値（IPC バリデーション失敗等）も安全側＝再開に倒す。
       const resumeChoice: unknown = await bridge.choose({
-        message: "前回の続きから再開しますか？",
-        detail: `${new Date(entry.savedAt).toLocaleString()} の自動保存があります。`,
-        buttons: ["自動保存から再開", "新規で再スタート"],
+        message: t("app.resumeConfirmTitle"),
+        detail: t("app.resumeConfirmDetail", { date: new Date(entry.savedAt).toLocaleString() }),
+        buttons: [t("app.resumeFromAutosave"), t("app.resumeFreshStart")],
         cancelId: 0,
       });
-      await mountEditors(payload, resumeChoice === 1 ? null : entry, {
+      await mountIntoActiveTab(payload, resumeChoice === 1 ? null : entry, {
         entryExists: true,
       });
       showPendingIntegrityBanner();
@@ -1889,17 +2381,13 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
 
     // base 不一致＝ディスク上の base が保存時と異なる → 3択（計画2 Task 7 Step 2 (b)）
     const choice = await bridge.choose({
-      message: "ファイルが前回の作業時から変更されています。どうしますか？",
-      detail:
-        `${new Date(entry.savedAt).toLocaleString()} の自動保存があります。\n` +
-        "「スナップショットのまま続行」＝保存時の内容を基準に再開します。\n" +
-        "「現行ファイルに載せ替え」＝今のファイルを基準に作業を作り直します。\n" +
-        "「破棄」＝自動保存を消して今のファイルを新規に開きます。",
-      buttons: ["スナップショットのまま続行", "現行ファイルに載せ替え", "破棄"],
+      message: t("app.baseChangedChoiceTitle"),
+      detail: t("app.baseChangedChoiceDetail", { date: new Date(entry.savedAt).toLocaleString() }),
+      buttons: [t("app.continueSnapshot"), t("app.rebaseCurrent"), t("app.discardAutosave")],
     });
     if (choice === 0) {
       // 保存時の base スナップショット基準で再開（ディスクの現行 base に依存しない）
-      await mountEditors(
+      await mountIntoActiveTab(
         {
           path: entry.basePath,
           content: entry.baseOriginal,
@@ -1909,7 +2397,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         { entryExists: true },
       );
     } else if (choice === 1) {
-      await mountEditors(payload, entry, { rebase: true, entryExists: true });
+      await mountIntoActiveTab(payload, entry, { rebase: true, entryExists: true });
     } else {
       // 破棄の remove 失敗も黙らせない（残存＝次回も再開の確認が出ることを伝える）
       let removeError: string | null = null;
@@ -1919,10 +2407,10 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       } catch (error) {
         removeError = error instanceof Error ? error.message : String(error);
       }
-      await mountEditors(payload, null, { entryExists: removeError !== null });
+      await mountIntoActiveTab(payload, null, { entryExists: removeError !== null });
       if (removeError) {
         banners.showWarning(
-          `自動保存を破棄できませんでした（次回も再開の確認が出ます）: ${removeError}`,
+          t("app.autosaveRemoveFailed", { message: removeError }),
         );
       }
     }
@@ -1930,8 +2418,16 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
   }
 
   async function openViaDialog(): Promise<void> {
-    const result = await bridge.openDialog();
-    if (result) await openFile(result);
+    try {
+      const result = await bridge.openDialog();
+      if (result) await openFile(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      void bridge.showError({
+        message: t("app.openFailedTitle"),
+        detail: message,
+      });
+    }
   }
 
   /**
@@ -1943,7 +2439,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       const opened = await bridge.readFile(path);
       if (opened.status === "error") {
         void bridge.showError({
-          message: "ファイルを開けませんでした",
+          message: t("app.openFailedTitle"),
           detail: opened.message,
         });
         return;
@@ -1956,7 +2452,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       void bridge.showError({
-        message: "ファイルを開けませんでした",
+        message: t("app.openFailedTitle"),
         detail: message,
       });
     }
@@ -1972,20 +2468,20 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         items = result.items;
         if (result.corrupted > 0) {
           banners.showWarning(
-            `前回の自動保存が読めません: 破損した自動保存が ${result.corrupted} 件あります`,
+            t("app.autosaveCorrupted", { count: result.corrupted }),
           );
         }
       } else {
-        banners.showWarning(`前回の自動保存が読めません: ${result.message}`);
+        banners.showWarning(t("app.autosaveReadFailed", { message: result.message }));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      banners.showWarning(`前回の自動保存が読めません: ${message}`);
+      banners.showWarning(t("app.autosaveReadFailed", { message }));
     }
     resumeListEl.innerHTML = "";
     if (items.length === 0) return;
     const title = document.createElement("p");
-    title.textContent = "続きから再開:";
+    title.textContent = t("app.resumeTitle");
     resumeListEl.appendChild(title);
     const list = document.createElement("ul");
     list.className = "akapen-resume-list";
@@ -2005,65 +2501,85 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     resumeListEl.appendChild(list);
   }
   void refreshResumeList();
+  onLanguageChange(() => {
+    void refreshResumeList();
+  });
 
-  // --- D&D（Task 7）: window への dragover/drop → getPathForFile → readFile ---
-  // ドラッグ中のドロップ枠（Task 9・design.md「操作状態」）: dragover が続く間だけ
-  // .is-dragging を付ける（dragleave は子要素間で発火が暴れるためタイマー方式）。
-  let dragFrameTimer: number | null = null;
-  const clearDragFrame = (): void => {
-    if (dragFrameTimer !== null) {
-      window.clearTimeout(dragFrameTimer);
-      dragFrameTimer = null;
+  // --- D&D: ウェルカム画面でだけ .md/.markdown を受け付ける ---
+  let dragDepth = 0;
+  const isWelcomeDropEnabled = (): boolean => state.basePath === null;
+  const hasDraggedFiles = (dataTransfer: DataTransfer | null): boolean => {
+    if (!dataTransfer) return false;
+    if (dataTransfer.files.length > 0) return true;
+    return Array.from(dataTransfer.types).includes("Files");
+  };
+  const hideDropOverlay = (): void => {
+    dragDepth = 0;
+    dropOverlay.hide();
+  };
+  const showDropError = (detail: string): void => {
+    void bridge.showError({
+      message: t("app.openFailedTitle"),
+      detail,
+    });
+  };
+  const onDragEnter = (event: DragEvent): void => {
+    event.preventDefault();
+    if (!hasDraggedFiles(event.dataTransfer)) return;
+    if (!isWelcomeDropEnabled()) {
+      hideDropOverlay();
+      return;
     }
-    appEl.classList.remove("is-dragging");
+    dragDepth += 1;
+    dropOverlay.show();
   };
   const onDragOver = (event: DragEvent): void => {
     event.preventDefault();
-    appEl.classList.add("is-dragging");
-    if (dragFrameTimer !== null) window.clearTimeout(dragFrameTimer);
-    dragFrameTimer = window.setTimeout(clearDragFrame, 200);
+    if (!hasDraggedFiles(event.dataTransfer) || !isWelcomeDropEnabled()) {
+      dropOverlay.hide();
+      return;
+    }
+    dropOverlay.show();
+  };
+  const onDragLeave = (event: DragEvent): void => {
+    event.preventDefault();
+    if (!hasDraggedFiles(event.dataTransfer)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropOverlay.hide();
   };
   const onDrop = (event: DragEvent): void => {
     event.preventDefault();
-    clearDragFrame();
-    const file = event.dataTransfer?.files?.[0];
-    if (!file) return;
+    hideDropOverlay();
+    if (!isWelcomeDropEnabled()) return;
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (files.length === 0) return;
+    if (files.length > 1) {
+      showDropError(t("app.dropOneFile"));
+      return;
+    }
+    const file = files[0];
+    if (!MARKDOWN_FILE_EXT.test(file.name)) {
+      showDropError(t("app.markdownOnly"));
+      return;
+    }
     void (async () => {
       try {
-        // preload がパス解決＋allowlist 登録（register-drop）までやってから返す
         const path = await bridge.getPathForFile(file);
-        await openPath(path); // 非 .md は main が error を返す → showError 表示
+        await openPath(path);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        void bridge.showError({
-          message: "ファイルを開けませんでした",
-          detail: message,
-        });
+        showDropError(message);
       }
     })();
   };
+  window.addEventListener("dragenter", onDragEnter);
   window.addEventListener("dragover", onDragOver);
+  window.addEventListener("dragleave", onDragLeave);
   window.addEventListener("drop", onDrop);
 
   // --- main からの push（開く3経路）＝購読解除関数を保持し destroy で解除 ---
   const unsubscribeOpenFile = bridge.onOpenFile((payload) => {
     void (async () => {
-      if (state.basePath && state.basePath !== payload.path) {
-        // レビュー作業中に別ファイルが来たら確認（autosave 済みなので破壊なし）
-        const ok = await bridge.confirm({
-          message: "現在の作業を閉じて開きますか？",
-          detail: `${baseNameOf(payload.path)} を開きます。今の作業は自動保存されています。`,
-        });
-        if (!ok) return;
-        // plan19 Phase 5 HIGH-4:
-        //   ① fileSwitchToken をインクリメント＝開きっぱなしの handleHeadingCrossedDialog
-        //      が確定すべきタイミングで「もう古いクロージャだ」と検知できるようにする
-        //      （後段 onAcceptSingle 前の snapshot 比較で showError へ倒す）。
-        //   ② flushAutosave を await＝旧実装の `void` キャストは IPC 完了前に openFile
-        //      が走るレースを作っていた。autosave-write の IPC を待ってから openFile。
-        fileSwitchToken += 1;
-        await flushAutosave();
-      }
       await openFile(payload);
     })();
   });
@@ -2212,9 +2728,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         sourceEditHasContentDeletion(sourceProjectionOnEntry.md, currentSource) &&
         !committed.some((annotation) => annotation.type === "deletion")
       ) {
-        throw new Error(
-          "削除した本文を赤取り消し線として保持できませんでした。変更は反映していません。",
-        );
+        throw new Error(t("app.sourceDeletionFailedTitle"));
       }
       const nextMd = setWorkingMarkdownPreservingAnnotations(nextProjectionMd);
       state.derivedMd = nextMd;
@@ -2316,7 +2830,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       } catch (error) {
         resetSourceEditorToProjectionOnFailure();
         void bridge.showError({
-          message: "原文モードの変更をプレビューに反映できませんでした。",
+          message: t("app.sourcePreviewFailedTitle"),
           detail: error instanceof Error ? error.message : String(error),
         });
         return;
@@ -2386,9 +2900,8 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         .replace(/\{>>[\s\S]*?<<\}/g, "");
       if (hasCriticDelimiter(sourceStripped)) {
         void bridge.showError({
-          message: "レビューを書き出せませんでした",
-          detail:
-            "本文に CriticMarkup 記法と衝突する文字列（++} や --} など）が含まれているため整合性を保てません。",
+          message: t("app.exportConflictTitle"),
+          detail: t("app.exportConflictDetail"),
         });
         return;
       }
@@ -2415,14 +2928,15 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         .replace(/\{>>[\s\S]*?<<\}/g, "");
       if (hasCriticDelimiter(stripped)) {
         void bridge.showError({
-          message: "レビューを書き出せませんでした",
-          detail:
-            "本文に CriticMarkup 記法と衝突する文字列（++} や --} など）が含まれているため整合性を保てません。",
+          message: t("app.exportConflictTitle"),
+          detail: t("app.exportConflictDetail"),
         });
         return;
       }
     }
     await writeAutosaveNow(); // 失敗は内部でバナー表示（添削＝完了フローは続行可）
+
+    currentExportSettings = await loadExportSettings();
 
     let built: { content: string; acceptedBodyIsEmpty: boolean };
     try {
@@ -2438,12 +2952,14 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         globalNote: state.globalNote,
         baseFileName: baseNameOf(state.basePath),
         reviewedAt: localReviewDate(),
+        language: currentLanguage,
+        exportSettings: currentExportSettings,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       void bridge.showError({
-        message: "レビューを書き出せませんでした",
-        detail: `本文に CriticMarkup 記法と衝突する文字列（++} や --} など）が含まれている可能性があります。整合性を保てないため保存していません。\n${message}`,
+        message: t("app.exportConflictTitle"),
+        detail: t("app.exportConflictDetailWithError", { message }),
       });
       return;
     }
@@ -2451,7 +2967,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     // ガード①: 全提案採用で本文が空になる完了の確認
     if (built.acceptedBodyIsEmpty) {
       const ok = await bridge.confirm({
-        message: "全提案を採用すると本文が空になります。このまま完了しますか？",
+        message: t("app.emptyAcceptConfirm"),
       });
       if (!ok) return;
     }
@@ -2472,7 +2988,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       void bridge.showError({
-        message: "レビューを書き出せませんでした",
+        message: t("app.exportConflictTitle"),
         detail: message,
       });
       return;
@@ -2480,7 +2996,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     if (result.status === "cancelled") return;
     if (result.status === "error") {
       void bridge.showError({
-        message: "レビューを書き出せませんでした",
+        message: t("app.exportConflictTitle"),
         detail: result.message,
       });
       return;
@@ -2499,11 +3015,16 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
     }
     if (removeError) {
       banners.showWarning(
-        `自動保存の削除に失敗しました（自動保存が残っています）: ${removeError}`,
+        t("app.autosaveDeleteAfterSaveFailed", { message: removeError }),
       );
     }
     autosaveExists = removeError !== null;
     autosaveDirty = false;
+    const tab = activeTab();
+    if (tab) {
+      Object.assign(tab, { dirty: false, autosaveDirty: false, entryExists: autosaveExists, restore: buildCurrentRestoreEntry(), workingMarkdown: currentWorkingMarkdown() });
+      renderTabs();
+    }
   }
 
   async function completeReview(): Promise<void> {
@@ -2541,7 +3062,7 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
         window.clearTimeout(statusbarTimer);
         statusbarTimer = null;
       }
-      clearDragFrame();
+      hideDropOverlay();
       unsubscribeOpenFile();
       unsubscribeBaseChanged();
       unsubscribeMenuOpen();
@@ -2550,14 +3071,21 @@ export function mountApp(root: HTMLElement, bridge: AkapenBridge): AppHandle {
       unsubscribeMenuFontSize();
       unsubscribeMenuOpenSettings();
       document.removeEventListener("keydown", onDocumentShortcutKey, true);
+      window.removeEventListener("dragenter", onDragEnter);
       window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
       window.removeEventListener("drop", onDrop);
       paneSync.destroy();
       marginNotes.destroy();
       // plan20 T14: source モード用 popup も解除（preview 用 popup は marginNotes.destroy() が担当）
       sourceCommentPopup.destroy();
+      detachTemplateManagerButton();
+      templateManager.destroy();
+      detachExportSettingsButton();
+      exportSettingsDialog.destroy();
       popover.destroy();
       shortcutPanel.destroy();
+      themeController.destroy();
       await destroyEditors();
       appEl.remove();
     },

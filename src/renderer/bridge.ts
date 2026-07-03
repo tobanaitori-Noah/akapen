@@ -69,11 +69,20 @@ export interface ShortcutSettings {
   bindings: Record<string, string>;
 }
 
+export type AkapenTheme = "light" | "dark" | "auto";
+export type AkapenLanguage = "ja" | "en";
+
 /** K7: アプリ設定（文字サイズ等・shortcuts.json と別ファイルで管理） */
 export interface AkapenSettings {
   version: 1;
   /** 文字サイズ（%）。50〜200 の整数。既定 100 */
   fontSize: number;
+  /** 表示テーマ。旧 settings.json 互換のため未指定は light として扱う */
+  theme?: AkapenTheme;
+  /** UI / export language. Defaults to Japanese. */
+  language?: AkapenLanguage;
+  /** Read-only API flag: false when settings.json has no language key. */
+  languageConfigured?: boolean;
 }
 
 export interface AkapenBridge {
@@ -115,6 +124,12 @@ export interface AkapenBridge {
   /** K7: アプリ設定の読み書き */
   readSettings(): Promise<AkapenSettings>;
   writeSettings(settings: AkapenSettings): Promise<AutosaveOpResult>;
+  /** Paid feature gate: true for Standard / Supporter. */
+  isPremiumUnlocked?(): Promise<boolean>;
+  /** Web server state sync for multi-tab active-file routing. */
+  setActiveFile?(path: string | null): Promise<void>;
+  /** Web server state sync for closing a tab. */
+  closeFile?(path: string): Promise<void>;
   /**
    * D&D 用。preload 内で webUtils.getPathForFile（実 File からのみパスを得られる）→
    * main の allowlist へ登録（akapen:register-drop）してからパスを返す。

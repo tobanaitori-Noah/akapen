@@ -1,6 +1,6 @@
 {
   "name": "akapen",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "AkaPen markdown review editor for local browser use",
   "type": "module",
   "bin": {
@@ -8,8 +8,10 @@
   },
   "files": [
     "dist",
+    "skills",
     "package.json",
     "README.md",
+    "README.en.md",
     "LICENSE"
   ],
   "scripts": {
